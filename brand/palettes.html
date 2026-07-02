@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evan Fischell Consulting — palette review</title>
+<style>
+  :root{
+    --bg:#0f1216; --card:#171b21; --line:#2a313a;
+    --ink:#e8ecf1; --muted:#9aa6b2; --faint:#6b7683;
+    --accent:#e8912a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:20px 16px 48px;
+    background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.55;
+  }
+  .wrap{max-width:720px; margin:0 auto;}
+  h1{font-size:20px; font-weight:600; margin:0 0 4px; letter-spacing:.2px;}
+  .sub{color:var(--muted); font-size:14px; margin:0 0 20px;}
+  .controls{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:24px;}
+  .controls .lbl{font-size:12px; color:var(--faint); margin-right:2px;}
+  button.vbtn{
+    padding:8px 14px; font-size:13px; border-radius:8px; cursor:pointer;
+    background:transparent; color:var(--ink); border:1px solid var(--line);
+    font-family:inherit;
+  }
+  button.vbtn.on{background:var(--accent); color:#241300; border-color:var(--accent); font-weight:600;}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:16px 16px 18px; margin-bottom:16px;
+  }
+  .card.rec{border-color:var(--accent);}
+  .card h2{font-size:16px; font-weight:600; margin:0 0 2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .badge{background:rgba(232,145,42,.16); color:var(--accent); font-size:11px; padding:3px 10px; border-radius:999px; font-weight:600;}
+  .note{font-size:13px; color:var(--muted); margin:0 0 14px;}
+  .chips{display:flex; gap:8px;}
+  .chip{flex:1; min-width:0; text-align:center;}
+  .sw{height:56px; border-radius:9px; border:1px solid rgba(255,255,255,.08);}
+  .role{font-size:11px; color:var(--muted); margin-top:6px;}
+  .hex{font-size:10px; color:var(--faint); font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;}
+  .foot{margin-top:20px; padding:14px 16px; background:var(--card); border:1px solid var(--line); border-radius:12px; font-size:13px; color:var(--muted);}
+  .foot b{color:var(--ink); font-weight:600;}
+  svg.filters{position:absolute; width:0; height:0;}
+</style>
+</head>
+<body>
+<svg class="filters" aria-hidden="true"><defs>
+  <filter id="cb-prot" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0"/></filter>
+  <filter id="cb-deut" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.70 0.30 0 0 0  0 0.30 0.70 0 0  0 0 0 1 0"/></filter>
+  <filter id="cb-trit" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0"/></filter>
+</defs></svg>
+
+<div class="wrap">
+  <h1>Evan Fischell Consulting — palette review</h1>
+  <p class="sub">Four colorblind-safe candidates. Tap a mode to preview how each looks under different color vision — the five chips should stay distinct in every mode.</p>
+
+  <div class="controls">
+    <span class="lbl">Preview as:</span>
+    <button class="vbtn on" data-mode="normal">Normal</button>
+    <button class="vbtn" data-mode="deut">Deuteranopia</button>
+    <button class="vbtn" data-mode="prot">Protanopia</button>
+    <button class="vbtn" data-mode="trit">Tritanopia</button>
+  </div>
+
+  <div id="palettes"></div>
+
+  <div class="foot"><b>How to read this:</b> the separation between chips is carried by lightness, not just hue — that's why it holds under all three forms of color vision. A (navy + amber) is the recommended default; C adds a safe second accent (teal) for diagrams.</div>
+</div>
+
+<script>
+  var PALETTES = [
+    { name:"A — Ink and ember", rec:true,
+      note:"Navy base, warm amber accent. Safest and most distinct — a hint of warmth for healthcare credibility.",
+      chips:[["Ink","#0F2233"],["Slate","#34505F"],["Mist","#9FB0BC"],["Paper","#F4F7F9"],["Amber","#E8912A"]] },
+    { name:"B — Deep sea", rec:false,
+      note:"Cool, frontier-leaning. Single luminous teal accent over an ink base.",
+      chips:[["Ink","#10243A"],["Steel","#33627F"],["Cool grey","#9AA7B2"],["Paper","#F5F8FB"],["Teal","#16A6C0"]] },
+    { name:"C — Blueprint", rec:false,
+      note:"A two-accent system (teal + amber) for diagrams and before/after stack maps.",
+      chips:[["Ink","#17293B"],["Slate","#4A6572"],["Paper","#F4F7F9"],["Teal","#1B9E8A"],["Amber","#E8A33D"]] },
+    { name:"D — Graphite and iris", rec:false,
+      note:"Most distinctive and modern. Blue-violet accent — the one to scrutinize under the simulator.",
+      chips:[["Graphite","#1F2632"],["Slate","#5B6472"],["Mist","#A7AEBA"],["Paper","#F5F6F8"],["Iris","#6C6BEF"]] }
+  ];
+  var host = document.getElementById("palettes");
+  PALETTES.forEach(function(p){
+    var el = document.createElement("div");
+    el.className = "card" + (p.rec ? " rec" : "");
+    var h = "<h2>" + p.name + (p.rec ? " <span class='badge'>Recommended start</span>" : "") + "</h2>";
+    h += "<p class='note'>" + p.note + "</p><div class='chips'>";
+    p.chips.forEach(function(c){
+      h += "<div class='chip'><div class='sw' style='background:" + c[1] + "'></div><div class='role'>" + c[0] + "</div><div class='hex'>" + c[1] + "</div></div>";
+    });
+    h += "</div>";
+    el.innerHTML = h;
+    host.appendChild(el);
+  });
+  var MODES = { normal:"none", deut:"url(#cb-deut)", prot:"url(#cb-prot)", trit:"url(#cb-trit)" };
+  var btns = document.querySelectorAll(".vbtn");
+  function setMode(m){
+    var f = MODES[m];
+    document.querySelectorAll(".sw").forEach(function(s){ s.style.filter = f; });
+    btns.forEach(function(b){ b.classList.toggle("on", b.dataset.mode === m); });
+  }
+  btns.forEach(function(b){ b.addEventListener("click", function(){ setMode(b.dataset.mode); }); });
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EFC palette vs. the field</title>
+<style>
+  :root{
+    --bg:#0f1216; --card:#171b21; --card2:#1c222a; --line:#2a313a;
+    --ink:#e8ecf1; --muted:#9aa6b2; --faint:#6b7683; --amber:#e8912a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; padding:20px 16px 48px; background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.5;}
+  .wrap{max-width:760px; margin:0 auto;}
+  h1{font-size:20px; font-weight:600; margin:0 0 4px;}
+  .sub{color:var(--muted); font-size:14px; margin:0 0 20px;}
+  .controls{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:22px;}
+  .controls .lbl{font-size:12px; color:var(--faint); margin-right:2px;}
+  button.vbtn{padding:7px 13px; font-size:13px; border-radius:8px; cursor:pointer;
+    background:transparent; color:var(--ink); border:1px solid var(--line); font-family:inherit;}
+  button.vbtn.on{background:var(--amber); color:#241300; border-color:var(--amber); font-weight:600;}
+  h2.grp{font-size:13px; font-weight:600; color:var(--faint); text-transform:uppercase; letter-spacing:.7px;
+    margin:26px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line);}
+  .row{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 13px; margin-bottom:9px;}
+  .row.efc{border-color:var(--amber); background:var(--card2); margin-bottom:6px;}
+  .rtop{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:9px;}
+  .nm{font-size:14px; font-weight:600;}
+  .efc .nm{color:var(--amber);}
+  .pers{font-size:12px; color:var(--muted); margin-top:8px;}
+  .chips{display:flex; gap:7px;}
+  .chip{flex:1; min-width:0; text-align:center;}
+  .chip.lead{flex:1.6;}
+  .sw{height:44px; border-radius:8px; border:1px solid rgba(255,255,255,.08);}
+  .cn{font-size:10px; color:var(--muted); margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .hx{font-size:9.5px; color:var(--faint); font-family:"SFMono-Regular",Consolas,monospace;}
+  .foot{margin-top:22px; padding:14px 16px; background:var(--card); border:1px solid var(--line); border-radius:12px; font-size:13px; color:var(--muted);}
+  .foot b{color:var(--ink); font-weight:600;}
+  .badge{background:rgba(232,145,42,.16); color:var(--amber); font-size:10px; padding:3px 9px; border-radius:999px; font-weight:600; vertical-align:middle;}
+  svg.filters{position:absolute; width:0; height:0;}
+</style>
+</head>
+<body>
+<svg class="filters" aria-hidden="true"><defs>
+  <filter id="cb-prot" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0"/></filter>
+  <filter id="cb-deut" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.70 0.30 0 0 0  0 0.30 0.70 0 0  0 0 0 1 0"/></filter>
+  <filter id="cb-trit" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0"/></filter>
+</defs></svg>
+
+<div class="wrap">
+  <h1>EFC palette vs. the field</h1>
+  <p class="sub">Palette A (navy + amber) against 20 healthcare-tech and consulting brands. Tap a vision mode — the amber accent stays distinct from the sea of blues and teals in every mode.</p>
+
+  <div class="controls">
+    <span class="lbl">Preview as:</span>
+    <button class="vbtn on" data-mode="normal">Normal</button>
+    <button class="vbtn" data-mode="deut">Deuteranopia</button>
+    <button class="vbtn" data-mode="prot">Protanopia</button>
+    <button class="vbtn" data-mode="trit">Tritanopia</button>
+  </div>
+
+  <div id="mount"></div>
+
+  <div class="foot"><b>What to look for:</b> the navy bases cluster tightly (credibility, but crowded); the accents are where brands separate. The field's reflex accent is teal/cyan — EFC's warm amber is the deliberate break, and nobody in the health-IT advisory set owns it.</div>
+</div>
+
+<script>
+  var EFC = { nm:"Evan Fischell Consulting", efc:true, pers:"Navy authority, warm amber signature, disciplined greys.",
+    chips:[["Ink","#0F2233",1],["Slate","#34505F",1],["Mist","#9FB0BC",1],["Amber","#E8912A",1]] };
+
+  var GROUPS = [
+    { title:"Core EHR / health-IT vendors", rows:[
+      { nm:"Epic Systems", pers:"Bold institutional crimson — not corporate blue.", chips:[["Crimson","#BA0239",1],["Grey","#666666",1]] },
+      { nm:"Oracle Health (Cerner)", pers:"Heavy enterprise red on dark.", chips:[["Oracle red","#C74634",1],["Charcoal","#312D2A",1]] },
+      { nm:"MEDITECH", pers:"Fresh, clinical, approachable teal.", chips:[["Teal","#33D5C1",1],["Navy","#2B3C54",1]] },
+      { nm:"athenahealth", pers:"Warm, human, friendly purple.", chips:[["Purple","#582C83",1],["Teal","#0093B2",1],["Yellow","#F2A900",1]] },
+      { nm:"Veradigm", pers:"Modern data/analytics indigo + coral.", chips:[["Indigo","#322959",1],["Coral","#E8594C",1]] }
+    ]},
+    { title:"Health-tech / analytics / RCM", rows:[
+      { nm:"NextGen Healthcare", pers:"Warm sunrise-to-plum, anti-clinical.", chips:[["Orange","#DC6B2F",1],["Plum","#41273B",1]] },
+      { nm:"Innovaccer", pers:"Confident, playful modern tech blue.", chips:[["Blue","#0060D6",1],["Red","#D62400",1],["Yellow","#F5BA0A",1]] },
+      { nm:"Optum", pers:"Energetic, disruptive, anti-blue.", chips:[["Orange","#FF612B",1],["Navy","#00396C",1]] },
+      { nm:"Waystar", pers:"Optimistic orange, 'lighting the way'.", chips:[["Orange","#FF6900",1],["Slate","#4C5966",1]] },
+      { nm:"Health Catalyst", pers:"Institutional data/analytics blue.", chips:[["Blue","#005CB7",1],["Navy","#052533",1],["Cyan","#0BC0FF",1]] }
+    ]},
+    { title:"Healthcare consulting / advisory", rows:[
+      { nm:"Nordic", pers:"Bold, tech-forward teal + violet.", chips:[["Dark teal","#04363F",1],["Teal","#04E7E8",1],["Violet","#7464F3",1]] },
+      { nm:"Huron", pers:"Trustworthy, conventional corporate blue.", chips:[["Blue","#00568C",1],["Grey","#C6CDD1",1]] },
+      { nm:"The Chartis Group", pers:"Navy authority lifted by cyan.", chips:[["Navy","#0E2A4B",1],["Cyan","#00B3CB",1]] },
+      { nm:"Impact Advisors", pers:"Grounded navy, fresh green.", chips:[["Navy","#10325C",1],["Green","#477D27",1]] },
+      { nm:"ZS Associates", pers:"Intellectual indigo + warm orange spark.", chips:[["Indigo","#2E3192",1],["Orange","#F7941E",1]] }
+    ]},
+    { title:"Major consulting", rows:[
+      { nm:"Accenture", pers:"Bold, modern, tech-forward purple.", chips:[["Purple","#A100FF",1],["Black","#000000",1]] },
+      { nm:"Deloitte", pers:"Fresh, growth-oriented green.", chips:[["Green","#86BC25",1],["Black","#000000",1]] },
+      { nm:"McKinsey & Company", pers:"Authoritative deep blue + red dot.", chips:[["Deep blue","#051C2C",1],["Blue","#2251FF",1],["Red","#E5471C",1]] },
+      { nm:"Boston Consulting Group", pers:"Serious, analytical green.", chips:[["Green","#147B58",1],["Black","#000000",1]] },
+      { nm:"Cognizant", pers:"Techy navy-to-cyan gradient.", chips:[["Navy","#000048",1],["Cyan","#36C0CF",1]] }
+    ]}
+  ];
+
+  function rowHTML(r){
+    var cls = "row" + (r.efc ? " efc" : "");
+    var h = "<div class='" + cls + "'><div class='rtop'><span class='nm'>" + r.nm + (r.efc ? " <span class='badge'>ours</span>" : "") + "</span></div><div class='chips'>";
+    r.chips.forEach(function(c,i){
+      var lead = (i===0 ? " lead" : "");
+      h += "<div class='chip" + lead + "'><div class='sw' style='background:" + c[1] + "'></div><div class='cn'>" + c[0] + "</div><div class='hx'>" + c[1] + "</div></div>";
+    });
+    h += "</div><div class='pers'>" + r.pers + "</div></div>";
+    return h;
+  }
+
+  var mount = document.getElementById("mount");
+  var html = "<h2 class='grp'>Reference — our recommended palette</h2>" + rowHTML(EFC);
+  GROUPS.forEach(function(g){
+    html += "<h2 class='grp'>" + g.title + "</h2>";
+    g.rows.forEach(function(r){ html += rowHTML(r); });
+  });
+  mount.innerHTML = html;
+
+  var MODES = { normal:"none", deut:"url(#cb-deut)", prot:"url(#cb-prot)", trit:"url(#cb-trit)" };
+  var btns = document.querySelectorAll(".vbtn");
+  function setMode(m){
+    var f = MODES[m];
+    document.querySelectorAll(".sw").forEach(function(s){ s.style.filter = f; });
+    btns.forEach(function(b){ b.classList.toggle("on", b.dataset.mode === m); });
+  }
+  btns.forEach(function(b){ b.addEventListener("click", function(){ setMode(b.dataset.mode); }); });
+</script>
+</body>
+</html>

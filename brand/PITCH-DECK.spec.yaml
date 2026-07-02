@@ -1,0 +1,204 @@
+# Deck spec — Evan Fischell Consulting pitch deck
+# Format: audience-switchable HTML deck (see skill: html-deck-authoring)
+# This file is the EDITING SOURCE for PITCH-DECK.html. Change content here,
+# then patch/regenerate the HTML to match. One logical slide may carry
+# per-audience variants; slides without `audience`/`variants` show for all.
+
+deck:
+  id: efc-pitch
+  title: "Evan Fischell Consulting — It shouldn't be hard."
+  file: PITCH-DECK.html
+  brand: efc                # tokens: Ink #0F2233 / Slate #34505F / Mist #9FB0BC / Paper #F4F7F9 / Amber #E8912A (+600 #C1731A, +50 #FBEEDC); IBM Plex Sans (600/500/400/300) + Plex Mono, embedded base64
+  chassis: efisch-html-deck # progress bar, sliding sections, dots + prev/next + count, arrows/space, touch swipe
+  audiences:
+    - id: exec
+      label: Executive
+      note: "CEO / COO — operational executives. Plain business language: cost, time, accountability, ownership. Never tech-first."
+      default: true
+    - id: tech
+      label: Technical
+      note: "CDIO / CIO / CTO and their teams. Full failure-mode detail; engineering vocabulary allowed below the cover."
+  url_params:
+    aud: "exec|tech — initial audience; toggle in UI unless lock=1"
+    lock: "1 hides the toggle AND disables all audience switching (keyboard included) — for sending a single-register link"
+  keys: "←/→/Space/PageUp/PageDown navigate slides; ↓/↑ (or A) switch audience on the current slide"
+  hosting:
+    review: "ReviewPortal asset f5472b01596f5893 (canonical file below)"
+    public_unlisted: "https://evanfischellconsulting.com/deck — no inbound links, noindex; deployed copy site/deck.html (re-copy from canonical on each efc-site deploy)"
+
+slides:
+  - id: title
+    dark: true
+    headline: "It shouldn't be hard."          # amber period, always
+    body: >
+      Health systems pay too much for operational technology that takes too
+      long, delivers less than promised, and can't be simply explained.
+      **We end that** — replacing under-delivering vendor products with
+      right-sized systems you own, delivered in weeks.
+    foot: "Evan Fischell · Principal"
+
+  - id: problem
+    kicker: "The problem"
+    variants:
+      tech:
+        headline: "You've seen the pattern"
+        layout: cards-2x2-plus-span
+        cards:
+          - t: "The turnkey solution isn't"
+            p: "What was sold as plug-and-play disappears into an \"integration\" phase that takes forever — and becomes a standing cost center."
+          - t: "It falls short of what was promised"
+            p: "Some of the capabilities that justified the purchase take longer to arrive than expected — and the explanation is often the same: \"more integration is needed.\""
+          - t: "A divergent source of truth"
+            p: "Instead of building on your core systems, it stands entirely apart. Worse than duplicative — now there are two versions of the truth."
+          - t: "Everything is a platform"
+            p: "The piece you actually bought it for may eventually work well — but you're now paying for a platform full of features you will never use."
+        span_card:
+          t: "…and by the time it's live, everyone is exhausted"
+          p: "The platform sounded great in the pitch — the real value was everything you'd build on top of it. But after the integration slog and one hard-won pilot, nobody in the building ever wants to build on it again."
+          accent: amber-left
+      exec:
+        headline: "The cost always exceeds the value — and nobody can explain why"
+        layout: statement
+        body: >
+          Too often, the same arc plays out: the "turnkey" solution takes
+          years to integrate, the promised value takes longer to arrive than
+          expected, and the platform you were sold stands apart from the
+          systems you already trust. By the time it's live, everyone is
+          exhausted — and nobody can give you a straight answer about why it
+          was this complicated.
+        callout: "**The honest answer:** it doesn't have to be this way. That gap — between what you pay and what you get — is exactly what we close."
+
+  - id: what-we-do
+    kicker: "What we do"
+    variants:
+      tech:
+        headline: "Right-sized systems you own, delivered in weeks"
+        body: "We replace under-delivering vendor products with systems built to your exact need — owned by you, run by your team."
+        cards:
+          - t: "What changes"
+            list: ["No license. No lock-in.", "No integration treadmill.", "Built to your need — and able to scale when you want it to."]
+          - t: "Our perspective"
+            # Evan (2026-07-02): abundance confidence — speed means no need for after-work / follow-on sales. Weave this theme through the deck.
+            list: ["Agentic engineering makes us 10–100× faster — so we're never worried about where the next engagement comes from.", "That means nothing we build is designed to create dependency: no lock-in, no padded scope, no follow-on sale engineered into the work.", "And where a vendor is genuinely worth keeping, we say so."]
+      exec:
+        headline: "A fraction of the cost. A few weeks. Yours."
+        body: "We replace the vendor product with a system that does exactly what your operation needs — then hand it over. Your team runs it. The license bills stop."
+        cards:
+          - t: "What it means for the budget"
+            p: "One engagement instead of a perpetual license. The integration treadmill ends, and the spend becomes an asset you own instead of a subscription you endure."
+          - t: "What it means for accountability"
+            p: "One accountable partner, problems solved in weeks, and a straight answer at every step. We can afford that honesty: we work fast enough that we never need to manufacture follow-on work — where a vendor is genuinely worth keeping, we say so."
+
+  - id: how-it-runs
+    kicker: "How an engagement runs"
+    layout: timeline
+    variants:
+      tech:
+        headline: "Kickoff to working software in six weeks"
+        steps:
+          - wk: "Weeks 1–4"
+            t: "Set up and look under the hood"
+            p: "We stand up a complete, production-grade delivery capability, securely connected to your systems — while reviewing the vendors you're worried about. One product, several, or the whole landscape."
+          - wk: "Week 4–6"
+            t: "See it working"
+            p: "A plan — and a working prototype that does what the vendor was supposed to do. Software you can touch, not another assessment."
+          - wk: "Then"
+            t: "Replace, or map the cleanup"
+            p: "Roughly two weeks to fully replace the first product — or a prioritized roadmap that cleans up your vendor dependencies over one to six months. Your ambition sets the pace."
+      exec:
+        # the exec version of the engagement mechanics IS the numbers slide
+        headline: "Measured in weeks, not fiscal years"
+        layout: kpi-grid
+        kpis:
+          - v: "2–4 wks";  l: "We're set up and looking";  s: "securely connected — no disruption to operations"
+          - v: "4–6 wks";  l: "You see it working";        s: "a real replacement, not a findings deck"
+          - v: "~2 wks";   l: "First vendor replaced";     s: "once you say go"
+          - v: "1–6 mo";   l: "Portfolio cleaned up";      s: "a prioritized roadmap — your pace"
+        callout: "**Every number is a commitment to an outcome** — spending reduced, complexity reduced, problems solved. Not an assessment, not a maturity model. You see it working before you commit to anything, and you're never locked in — including to us."
+
+  - id: what-were-not
+    kicker: "What we're not"
+    headline: "Three things we will never sell you"
+    layout: timeline
+    # cards 1–2 shared; card 3 differs by audience (exec version stays positive — no "rip and replace")
+    steps_shared:
+      - t: "Another platform"
+        p: "We exist to reduce the number of platforms you pay for. Our speed is our security — we don't need lock-in or follow-on sales to keep busy. You own what we build, and we're happy to maintain it: 100% coverage, or exactly as much support as your team needs."
+      - t: "A \"turnkey\" solution"
+        p: "One size does not fit all — and with the technology available today, it doesn't have to. Everything we deliver is built to your need, not to a market's average."
+    variants:
+      tech:
+        step3:
+          t: "Rip-and-replace-everything"
+          p: "Some of your vendor spend is net-positive and worth keeping — we'll tell you which, even when it's less work for us. We work with your existing investments and can integrate with anything."
+      exec:
+        step3:
+          t: "Disruption for its own sake"
+          p: "We work with your existing investments — and we can integrate with anything. Where something serves you well, we keep it and build around it."
+
+  - id: under-the-hood
+    variants:
+      exec:
+        kicker: "For your technology team"
+        headline: "Engineering your CDIO can inspect"
+      tech:
+        kicker: "Under the hood"
+        headline: "How we actually deliver"
+    cards:  # shared card content across both variants
+      - t: "Secure & compliant by construction"
+        p: "Our delivery platform connects to your systems under your constraints from day one — never retrofitted."
+      - t: "A real product pipeline"
+        p: "Development environment, QA, acceptance testing, and a high-reliability production environment — stood up in the first month."
+      - t: "Agentic-era engineering discipline"
+        p: "Fully deterministic solutions where they're simplest; embedded agents where they genuinely earn their place. Never chatbots, never agents for show."
+      - t: "You own it"
+        p: "And we'll support it as much as you want — 100% support, a partnership with your team, or anywhere in between. Ownership stays yours either way."
+        # NOTE (Evan, 2026-07-02): do not use "built for exit" language on slides — it reads as one-foot-out-the-door. "You own it + we support as much as you want" is the framing.
+
+  - id: beyond
+    held: true   # Evan (2026-07-02): hold this slide for now — removed from the HTML; content stays here for easy restore
+    kicker: "Beyond the beachhead"
+    headline: "Operational technology is where we start"
+    body: "It's where the pain is most acute and the returns come fastest. The same capability then extends into the deeper layers of your technology investment."
+    cards:
+      - t: "Analytics transformation"
+        p: "Rationalizing and modernizing the data and analytics estate."
+      - t: "Digital health"
+        p: "The patient- and clinician-facing layer."
+    callout: "Each expansion runs on the same discipline: **secure, right-sized, owned by you.**"
+
+  - id: why-us
+    kicker: "Why us"
+    headline: "Why this works now"
+    cards:
+      - t: "Problems solved, fast"
+        p: "By week 4–6 the first problem is solved and demonstrable — spending down, complexity down. Proof, not promises."
+      - t: "Native to the agentic-engineering era"
+        p: "Built in this era, not retrofitted to it — which is why we deliver at a speed and cost incumbents can't match."
+      - t: "We don't need to trap you"
+        p: "Being 10–100× faster means we're confident there will always be more problems worth solving. Nothing we build is designed for dependency — no platform to upsell, no scope padded to create after-work."
+      - t: "Healthcare-focused from day one"
+        p: "Compliance and clinical-adjacent constraints are the starting point, not an adaptation."
+
+  - id: close
+    dark: true
+    headline: "It shouldn't be hard."
+    body: "Let's look at your vendor list."
+    contact:
+      name: "Evan Fischell · Principal"
+      email: "evan@evanfischellconsulting.com"
+      web: "evanfischellconsulting.com"
+
+  - id: appendix-pipeline
+    kicker: "Appendix · The product pipeline"
+    headline: "From commit to production, safely and often"
+    layout: timeline
+    steps:
+      - t: "Build — on our secure cloud"
+        p: "We establish a development environment on our secure cloud — that's where we build. Your engineers get access to our repository and can watch the solutions develop."
+      - t: "QA — automatic, multiple times a day"
+        p: "Every committed change flows to QA automatically. We can provide QA independently — and we're happy to have your team participate."
+      - t: "Release — as often as weekly"
+        p: "Production code ships when QA signs off — as often as weekly."
+      - t: "Deploy — to exactly the audience you choose"
+        p: "Production assets are deployed and usable by whoever you decide: a few engineers and analysts, a pilot group, or your entire organization."
