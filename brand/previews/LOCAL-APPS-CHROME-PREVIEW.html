@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>EFC House Chrome Preview</title>
+<style>
+/* ===== embedded chrome.css (Evan Fischell Consulting theme, unmodified from
+   templates/efisch-frontend-template/static/chrome.css) — scoped per panel
+   below via [data-theme] on each .preview-pane wrapper. ===== */
+:root{
+  --bg:#F4F7F9; --paper:#F4F7F9;
+  --panel:#ffffff; --panel2:#EAF0F3;
+  --paper-2:#EAF0F3; --panel-2:#ffffff; --panel-3:#E4ECEF;
+  --chip:#EAF0F3;
+  --ink:#0F2233; --ink-soft:#243A4A; --muted:#34505F; --muted-2:#5C7480; --faint:#5C7480;
+  --line:#D5DEE3; --line-strong:#C2CFD6; --border:#D5DEE3;
+  --accent:#C1731A; --accent2:#A65F13; --accent-strong:#A65F13; --accent-ink:#8A5010;
+  --accent-soft:#FBEEDC; --accent-tint:#FDF6EC;
+  --btn-primary-bg:#A65F13; --btn-primary-bg-hover:#8A5010; --btn-primary-ink:#ffffff;
+  --mark-bg:#0F2233; --mark-ink:#F4F7F9;
+  --good:#3F7A5C; --good-strong:#2E5C44; --good-soft:#E3EFE8; --green:#3F7A5C;
+  --info:#3E5F78; --blue:#3E5F78;
+  --warn:#8A6D23; --warm-gold:#8A6D23;
+  --err:#A23E30; --bad:#A23E30; --red:#A23E30;
+  --danger:#A23E30; --danger-strong:#7E2F24; --danger-soft:#F3E2DE;
+  --header-bg-1:#F8FAFB; --header-bg-2:#EAF0F3; --btn-bg:#ffffff;
+  --radius-xl:22px; --radius-lg:17px; --radius:12px; --radius-sm:9px; --pill:999px;
+  --shadow-sm:0 1px 2px rgba(15,34,51,0.06);
+  --shadow:0 1px 2px rgba(15,34,51,0.06),0 12px 28px -16px rgba(15,34,51,0.24);
+  --shadow-card:0 1px 0 rgba(255,255,255,0.6) inset,0 1px 2px rgba(15,34,51,0.06),0 18px 38px -22px rgba(15,34,51,0.28);
+  --font:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-serif:var(--font-sans);
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+.preview-pane[data-theme="dark"]{
+  --bg:#0B1926; --paper:#0B1926;
+  --panel:#0F2233; --panel2:#14293B;
+  --paper-2:#14293B; --panel-2:#16293A; --panel-3:#1B3244;
+  --chip:#14293B;
+  --ink:#F4F7F9; --ink-soft:#D9E2E7; --muted:#9FB0BC; --muted-2:#7E93A0; --faint:#8FA2AE;
+  --line:#223A4C; --line-strong:#2C4B60; --border:#223A4C;
+  --accent:#E8912A; --accent2:#F0A64C; --accent-strong:#F0A64C; --accent-ink:#F3B466;
+  --accent-soft:#33291A; --accent-tint:#241C13;
+  --btn-primary-bg:#E8912A; --btn-primary-bg-hover:#F0A64C; --btn-primary-ink:#0B1926;
+  --mark-bg:#0B1926; --mark-ink:#F4F7F9;
+  --good:#6FAE8B; --good-strong:#8CC5A6; --good-soft:#182A22; --green:#6FAE8B;
+  --info:#7FA6C2; --blue:#7FA6C2;
+  --warn:#D9B150; --warm-gold:#D9B150;
+  --err:#D97F6C; --bad:#D97F6C; --red:#D97F6C;
+  --danger:#D97F6C; --danger-strong:#EA9A86; --danger-soft:#33221C;
+  --header-bg-1:#0F2233; --header-bg-2:#0B1926; --btn-bg:#16293A;
+  --shadow-sm:0 1px 2px rgba(0,0,0,0.30);
+  --shadow:0 1px 2px rgba(0,0,0,0.30),0 12px 28px -16px rgba(0,0,0,0.50);
+  --shadow-card:0 1px 0 rgba(255,255,255,0.04) inset,0 1px 2px rgba(0,0,0,0.30),0 18px 38px -22px rgba(0,0,0,0.55);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+.preview-pane{background:var(--bg);color:var(--ink);font:400 15px/1.55 var(--font-sans);-webkit-font-smoothing:antialiased;
+  border-radius:16px;overflow:hidden;border:1px solid var(--line-strong)}
+.preview-pane a{color:var(--accent-ink)}
+.preview-pane h1,.preview-pane h2,.preview-pane h3{font-family:var(--font-sans);color:var(--ink);font-weight:600}
+.preview-pane code,.preview-pane pre,.preview-pane kbd,.preview-pane samp,.preview-pane .ef-mono{font-family:var(--font-mono)}
+
+.ef-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:14px 20px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,var(--header-bg-1),var(--header-bg-2))}
+.ef-logo{width:30px;height:30px;border-radius:8px;flex:0 0 auto;
+  background:var(--mark-bg);color:var(--mark-ink);
+  display:flex;align-items:center;justify-content:center;font-size:16px}
+.ef-titles{display:flex;flex-direction:column;min-width:0}
+.ef-title{font-family:var(--font-sans);font-size:17px;margin:0;font-weight:600;letter-spacing:.2px;color:var(--ink)}
+.ef-sub{color:var(--faint);font-size:12px}
+.ef-spacer{flex:1}
+.ef-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.ef-btn{font:inherit;display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+  text-decoration:none;background:var(--btn-bg);color:var(--ink);
+  border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px}
+.ef-btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+.ef-btn:active{transform:translateY(1px)}
+.ef-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ef-btn.primary{background:var(--btn-primary-bg);border-color:var(--btn-primary-bg);color:var(--btn-primary-ink);font-weight:600}
+.ef-btn.primary:hover{background:var(--btn-primary-bg-hover);border-color:var(--btn-primary-bg-hover);color:var(--btn-primary-ink)}
+.ef-btn.is-fav{color:var(--accent-ink);border-color:var(--accent)}
+
+.ef-wrap{max-width:1100px;margin:0 auto;padding:18px 20px}
+.ef-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.ef-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.ef-k{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+.ef-v{font-size:1.5rem;font-weight:600;margin-top:3px;font-family:var(--font-sans)}
+.ef-sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-top:14px}
+.ef-sec h2{font-size:1rem;margin:0 0 10px;font-weight:600}
+table.ef{width:100%;border-collapse:collapse;font-size:.88rem}
+table.ef th,table.ef td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.ef th{color:var(--faint);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+table.ef tbody tr:hover{background:var(--panel2)}
+.ef-chip{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--muted)}
+.ef-chip.accent{background:var(--accent-tint);color:var(--accent-ink);border-color:var(--accent)}
+.preview-pane[data-theme="light"] .ef-chip.info{background:#E3EBF2;color:#2E4A61;border-color:#CBDAE6}
+.preview-pane[data-theme="light"] .ef-chip.warn{background:#F3ECD8;color:#6E5518;border-color:#E4D6AE}
+.preview-pane[data-theme="light"] .ef-chip.err{background:#F3E2DE;color:#7E2F24;border-color:#E6C6BE}
+.preview-pane[data-theme="light"] .ef-chip.good{background:#E3EFE8;color:#2E5C44;border-color:#C7DFD1}
+.preview-pane[data-theme="dark"] .ef-chip.info{background:#182531;color:#9FC0DE;border-color:#28384A}
+.preview-pane[data-theme="dark"] .ef-chip.warn{background:#2E2716;color:#DCC079;border-color:#453A22}
+.preview-pane[data-theme="dark"] .ef-chip.err{background:#33221C;color:#E6A08A;border-color:#4A3128}
+.preview-pane[data-theme="dark"] .ef-chip.good{background:#182A22;color:#8CC596;border-color:#284436}
+.ef-muted{color:var(--muted)} .ef-faint{color:var(--faint)} .ef-mono{font-variant-numeric:tabular-nums}
+.ef-dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--faint);margin-right:6px;vertical-align:middle}
+.ef-dot.ok{background:var(--good)} .ef-dot.bad{background:var(--err)}
+
+.ef-mark{width:30px;height:30px;border-radius:8px;flex:0 0 auto;
+  background:var(--mark-bg);color:var(--mark-ink);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-sans);font-weight:600;font-size:13px;letter-spacing:.01em;
+  line-height:1}
+.ef-mark::after{content:"·";color:var(--accent);font-weight:700;margin-left:1px}
+.ef-lockup{font-family:var(--font-sans);font-size:13px;color:var(--muted);
+  display:inline-flex;align-items:baseline;gap:.3em}
+.ef-lockup .ef-lockup-name{font-weight:600;color:var(--ink)}
+.ef-lockup .ef-lockup-desc{font-weight:300;color:var(--muted)}
+.ef-lockup .ef-lockup-dot{color:var(--accent);font-weight:700}
+
+/* ===== banner strip mock (Ink 900, always-ink regardless of pane theme) ===== */
+.efbanner-mock{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 14px;
+  font-family:"IBM Plex Sans",sans-serif;font-size:12px;line-height:1.2;color:#9FB0BC;
+  background:#0B1926;border-bottom:1px solid rgba(159,176,188,.18);
+}
+.efbanner-mock b{color:#9FB0BC;font-weight:700;letter-spacing:.06em;font-size:11px;opacity:.85}
+.efbanner-mock .bar{position:relative;width:70px;height:8px;border-radius:999px;overflow:hidden;background:rgba(159,176,188,.16);display:inline-block;vertical-align:middle;margin:0 6px}
+.efbanner-mock .bar > span{position:absolute;inset:0;width:38%;border-radius:999px;background:linear-gradient(90deg,#E8912A,#C1731A)}
+.efbanner-mock .fav{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(159,176,188,.22);border-radius:999px;background:rgba(159,176,188,.08);padding:3px 10px;font-size:11px;font-weight:600}
+.efbanner-mock .star{color:#E8912A;font-size:15px;margin-left:auto}
+
+/* ===== page chrome around the two panes ===== */
+</style>
+<style>
+  body{margin:0;background:#eef2f4;font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#0F2233;padding:28px 20px 60px}
+  .page-wrap{max-width:1400px;margin:0 auto}
+  .page-head{margin-bottom:22px}
+  .page-head h1{font-size:26px;margin:0 0 6px;font-weight:600}
+  .page-head p{margin:0;color:#34505F;font-size:14px;max-width:760px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media (max-width:980px){.cols{grid-template-columns:1fr}}
+  .col-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5C7480;margin:0 0 8px 2px}
+  .swatches{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 26px}
+  .swatch{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:#34505F}
+  .swatch .chip{width:56px;height:36px;border-radius:8px;border:1px solid rgba(15,34,51,.12)}
+  .annot{background:#FBEEDC;border:1px solid #F0D9B0;border-radius:12px;padding:16px 18px;margin-top:26px;font-size:13.5px;line-height:1.6;color:#0F2233}
+  .annot b{color:#8A5010}
+  .annot code{font-family:"IBM Plex Mono",monospace;background:rgba(15,34,51,.06);padding:1px 5px;border-radius:4px;font-size:12px}
+  footer.page-footer{margin-top:36px;text-align:center;font-size:12px;color:#5C7480}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <div class="page-head">
+    <h1>EFC House Chrome Preview</h1>
+    <p>Evan Fischell Consulting rebrand of the EfischServer local-apps chrome — "Ink &amp; Ember" (navy + amber), IBM Plex Sans/Mono. Token remap only: every selector and custom-property name is unchanged from the pre-rebrand chrome.css; only values changed. Light and dark shown side by side below, using the exact CSS variables from <code>templates/efisch-frontend-template/static/chrome.css</code>.</p>
+  </div>
+
+  <div class="swatches">
+    <div class="swatch"><div class="chip" style="background:#0B1926"></div>Ink 900</div>
+    <div class="swatch"><div class="chip" style="background:#0F2233"></div>Ink 800</div>
+    <div class="swatch"><div class="chip" style="background:#34505F"></div>Slate 600</div>
+    <div class="swatch"><div class="chip" style="background:#9FB0BC"></div>Mist 300</div>
+    <div class="swatch"><div class="chip" style="background:#F4F7F9;border-color:#ccc"></div>Paper 50</div>
+    <div class="swatch"><div class="chip" style="background:#E8912A"></div>Amber 500</div>
+    <div class="swatch"><div class="chip" style="background:#C1731A"></div>Amber 600</div>
+    <div class="swatch"><div class="chip" style="background:#FBEEDC"></div>Amber 50</div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <p class="col-label">Light mode</p>
+      <div class="preview-pane" data-theme="light">
+        <div class="efbanner-mock">
+          <b>EFISCHSERVER</b>
+          <span>Codex wk</span><span class="bar"><span></span></span><span>38% · resets Mon 9:00am</span>
+          <span>Claude wk</span><span class="bar"><span style="width:61%;background:linear-gradient(90deg,#E8912A,#C1731A)"></span></span><span>61%</span>
+          <span class="fav">▸ WorkApps</span><span class="fav">▸ LogViewer</span>
+          <span class="star">★</span>
+        </div>
+        <header class="ef-header">
+          <div class="ef-mark">EF</div>
+          <div class="ef-titles">
+            <h1 class="ef-title">Sample App</h1>
+            <div class="ef-sub">a one-line subtitle</div>
+          </div>
+          <span class="ef-spacer"></span>
+          <div class="ef-actions">
+            <button class="ef-btn is-fav">★ Favorited</button>
+            <a class="ef-btn" href="#">⌂ Hub</a>
+          </div>
+        </header>
+        <main class="ef-wrap">
+          <div class="ef-grid">
+            <div class="ef-card"><div class="ef-k">Status</div><div class="ef-v">OK</div></div>
+            <div class="ef-card"><div class="ef-k">Requests / day</div><div class="ef-v">1,204</div></div>
+            <div class="ef-card"><div class="ef-k">Uptime</div><div class="ef-v">99.98%</div></div>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Buttons</h2>
+            <div class="ef-actions" style="gap:10px">
+              <a class="ef-btn" href="#">Default</a>
+              <a class="ef-btn primary" href="#">Primary</a>
+              <a class="ef-btn is-fav" href="#">★ Favorited</a>
+            </div>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Chips</h2>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <span class="ef-chip">default</span>
+              <span class="ef-chip accent">accent</span>
+              <span class="ef-chip info">info</span>
+              <span class="ef-chip warn">warn</span>
+              <span class="ef-chip err">err</span>
+              <span class="ef-chip good">good</span>
+            </div>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Status dots</h2>
+            <div><span class="ef-dot ok"></span>Service healthy &nbsp; <span class="ef-dot bad"></span>Service down &nbsp; <span class="ef-dot"></span>Unknown</div>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Key / value</h2>
+            <table class="ef">
+              <tr><th>Field</th><th>Value</th></tr>
+              <tr><td>Service ID</td><td class="ef-mono">app-directory</td></tr>
+              <tr><td>Branch</td><td class="ef-mono">dev</td></tr>
+              <tr><td>Last deploy</td><td>2 hours ago</td></tr>
+              <tr><td>Owner</td><td>Evan Fischell Consulting</td></tr>
+            </table>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Table</h2>
+            <table class="ef">
+              <tr><th>App</th><th>Port</th><th>Status</th></tr>
+              <tr><td>WorkApps</td><td class="ef-mono">8090</td><td><span class="ef-dot ok"></span>running</td></tr>
+              <tr><td>LogViewer</td><td class="ef-mono">8092</td><td><span class="ef-dot ok"></span>running</td></tr>
+              <tr><td>SecretVault</td><td class="ef-mono">8094</td><td><span class="ef-dot bad"></span>stopped</td></tr>
+            </table>
+          </div>
+
+          <footer style="margin-top:20px;padding:14px 0">
+            <span class="ef-lockup"><span class="ef-lockup-name">Evan Fischell</span><span class="ef-lockup-desc">Consulting</span><span class="ef-lockup-dot">.</span></span>
+          </footer>
+        </main>
+      </div>
+    </div>
+
+    <div>
+      <p class="col-label">Dark mode</p>
+      <div class="preview-pane" data-theme="dark">
+        <div class="efbanner-mock">
+          <b>EFISCHSERVER</b>
+          <span>Codex wk</span><span class="bar"><span></span></span><span>38% · resets Mon 9:00am</span>
+          <span>Claude wk</span><span class="bar"><span style="width:61%;background:linear-gradient(90deg,#E8912A,#C1731A)"></span></span><span>61%</span>
+          <span class="fav">▸ WorkApps</span><span class="fav">▸ LogViewer</span>
+          <span class="star">★</span>
+        </div>
+        <header class="ef-header">
+          <div class="ef-mark">EF</div>
+          <div class="ef-titles">
+            <h1 class="ef-title">Sample App</h1>
+            <div class="ef-sub">a one-line subtitle</div>
+          </div>
+          <span class="ef-spacer"></span>
+          <div class="ef-actions">
+            <button class="ef-btn is-fav">★ Favorited</button>
+            <a class="ef-btn" href="#">⌂ Hub</a>
+          </div>
+        </header>
+        <main class="ef-wrap">
+          <div class="ef-grid">
+            <div class="ef-card"><div class="ef-k">Status</div><div class="ef-v">OK</div></div>
+            <div class="ef-card"><div class="ef-k">Requests / day</div><div class="ef-v">1,204</div></div>
+            <div class="ef-card"><div class="ef-k">Uptime</div><div class="ef-v">99.98%</div></div>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Buttons</h2>
+            <div class="ef-actions" style="gap:10px">
+              <a class="ef-btn" href="#">Default</a>
+              <a class="ef-btn primary" href="#">Primary</a>
+              <a class="ef-btn is-fav" href="#">★ Favorited</a>
+            </div>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Chips</h2>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <span class="ef-chip">default</span>
+              <span class="ef-chip accent">accent</span>
+              <span class="ef-chip info">info</span>
+              <span class="ef-chip warn">warn</span>
+              <span class="ef-chip err">err</span>
+              <span class="ef-chip good">good</span>
+            </div>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Status dots</h2>
+            <div><span class="ef-dot ok"></span>Service healthy &nbsp; <span class="ef-dot bad"></span>Service down &nbsp; <span class="ef-dot"></span>Unknown</div>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Key / value</h2>
+            <table class="ef">
+              <tr><th>Field</th><th>Value</th></tr>
+              <tr><td>Service ID</td><td class="ef-mono">app-directory</td></tr>
+              <tr><td>Branch</td><td class="ef-mono">dev</td></tr>
+              <tr><td>Last deploy</td><td>2 hours ago</td></tr>
+              <tr><td>Owner</td><td>Evan Fischell Consulting</td></tr>
+            </table>
+          </div>
+
+          <div class="ef-sec">
+            <h2>Table</h2>
+            <table class="ef">
+              <tr><th>App</th><th>Port</th><th>Status</th></tr>
+              <tr><td>WorkApps</td><td class="ef-mono">8090</td><td><span class="ef-dot ok"></span>running</td></tr>
+              <tr><td>LogViewer</td><td class="ef-mono">8092</td><td><span class="ef-dot ok"></span>running</td></tr>
+              <tr><td>SecretVault</td><td class="ef-mono">8094</td><td><span class="ef-dot bad"></span>stopped</td></tr>
+            </table>
+          </div>
+
+          <footer style="margin-top:20px;padding:14px 0">
+            <span class="ef-lockup"><span class="ef-lockup-name">Evan Fischell</span><span class="ef-lockup-desc">Consulting</span><span class="ef-lockup-dot">.</span></span>
+          </footer>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <div class="annot">
+    <b>Where amber appears (≤10% rule):</b> the EF· monogram's period, the primary-button fill, the favorited-state border/text, the hover border on default buttons, the live-usage bar fill for Claude (the "signature accent" highlight), the current-app favorite star, the footer lockup's period, and the opt-in <code>.ef-chip.accent</code> tint. None of these are large fills — the surfaces that do structural work (headers, cards, tables, the banner strip) stay ink/paper/mist, and the default chip is neutral so an unqualified chip never spends the accent. Semantic ok/warn/err colors are desaturated navy-and-slate-based greens/golds/reds, kept visually distinct from the amber signature (warn leans gold, not amber, per the brand rule). On light surfaces amber renders as Amber 600 (<code>#C1731A</code>, contrast-safe); on dark surfaces as Amber 500 (<code>#E8912A</code>). <b>Contrast:</b> the primary button uses a darker amber fill on light (<code>#A65F13</code> + white, ~4.9:1 AA) and flips to Amber 500 with <em>ink</em> text on dark (~7:1) — the accent is separated by lightness, not hue, in both themes.
+  </div>
+
+  <footer class="page-footer">Evan Fischell Consulting &middot; Local Apps Rebrand &mdash; Phase 0 preview &middot; token remap of <code>templates/efisch-frontend-template/static/chrome.css</code> + AppDirectory banner/hub chrome</footer>
+</div>
+</body>
+</html>

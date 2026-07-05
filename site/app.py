@@ -3,6 +3,7 @@ import json
 import re
 import secrets as pysecrets
 import time
+import traceback
 from pathlib import Path
 
 from flask import Flask, jsonify, redirect, request, send_from_directory
@@ -54,31 +55,44 @@ CHAT_PROTOCOL = """
 
 ## Response protocol (strict)
 Respond with ONLY a JSON object: {"reply": "<your message to the visitor>",
-"action": null}. When — and only when — the visitor has clearly agreed to have
-a custom one-page brief created, set "action" to {"type": "create_page",
-"brief": "<one paragraph describing the visitor's role, situation, and what
-the page should cover>"} and keep "reply" short (tell them the page is being
-prepared). Keep replies under 160 words. Plain text only in reply — no markdown
-headings, no bullets unless brief.
+"action": null}. When the visitor explicitly asks you to create a page or
+website (an explicit request counts as agreement), or has clearly agreed to
+your offer of one, set "action" to {"type": "create_page", "brief": "<one
+paragraph describing what the page should be — the visitor's request, their
+role/situation if relevant, and what it should cover>"} and keep "reply"
+short (tell them the page is being prepared). Keep replies under 160 words.
+Plain text only in reply — no markdown headings, no bullets unless brief.
 """
 
-PAGE_SYS = """You generate a single, complete, self-contained HTML page — a
-custom one-page brief from Evan Fischell Consulting, tailored to the visitor
-brief you are given. Rules: one file, no external resources (no fonts, images,
-scripts); inline CSS only. Brand: ink #0F2233 (header/footer bands, headline
-text), slate #34505F body text, paper #F4F7F9 background, amber #E8912A used
-sparingly (a 44px×2px rule, key numbers, the period after headlines); font
-stack: 'IBM Plex Sans','Segoe UI',system-ui,sans-serif. Structure: ink header
-band with the wordmark "Evan Fischell Consulting." (Consulting in font-weight
-300, the period in amber) and a tailored headline ending in an amber period;
-2–4 short sections grounded ONLY in the company facts below; an ink footer with
-contact evan@evanfischellconsulting.com. Include <meta name="robots"
-content="noindex, nofollow">. Stay strictly within the company facts — no
-pricing, no client names, no certifications, no guarantees. Output ONLY the
-HTML document, no code fences.
+PAGE_SYS = """You generate a single, complete, self-contained HTML page for a
+visitor, on behalf of the Evan Fischell Consulting embedded agent. The visitor
+brief tells you what they want. Two modes:
+
+1. **Professional brief** (the visitor's role/situation and the firm): 2–4
+   short sections grounded ONLY in the company facts below — no pricing, no
+   client names, no certifications, no guarantees.
+2. **Anything-else page** (the visitor asked for a page on some topic — a
+   hobby, an interest, something playful): make it genuinely good and
+   delightful. Accurate, tasteful, family-friendly. It is a demonstration of
+   craft, so make it charming.
+
+Hard rules for both: one file, no external resources (no fonts, images,
+scripts, trackers); inline CSS only. Never: offensive content, impersonation
+of real people or companies, medical/legal/financial advice, anything
+involving patient data. Include <meta name="robots" content="noindex,
+nofollow">. Output ONLY the HTML document, no code fences.
+
+Brand chrome (both modes): ink #0F2233 header band with the wordmark
+"Evan Fischell Consulting." (Consulting font-weight 300, the period in amber
+#E8912A) and a headline ending in an amber period; paper #F4F7F9 background,
+slate #34505F body text, amber used sparingly (a 44px×2px rule, accents);
+font stack: 'IBM Plex Sans','Segoe UI',system-ui,sans-serif. Ink footer:
+"Prepared by the Evan Fischell Consulting embedded agent ·
+evan@evanfischellconsulting.com". Inside the chrome, mode 2 pages may play
+with layout freely.
 
 ## Company facts
-""" + ""
+"""
 
 
 @app.before_request
@@ -144,6 +158,10 @@ def agent_chat():
             else:
                 m = re.search(r"\{.*\}", raw, re.S)
                 out = json.loads(m.group(0)) if m else {"reply": raw, "action": None}
+        if isinstance(out, list):
+            out = next((x for x in out if isinstance(x, dict)), None) or {"reply": raw, "action": None}
+        if not isinstance(out, dict):
+            out = {"reply": str(out), "action": None}
         reply = str(out.get("reply") or "").strip() or (
             "Sorry — I lost my train of thought. Try again?")
         action = out.get("action") if isinstance(out.get("action"), dict) else None
@@ -151,6 +169,7 @@ def agent_chat():
             action = None
         return jsonify({"reply": reply, "action": action})
     except Exception:
+        traceback.print_exc()
         return jsonify({"reply": "Something went wrong on my end. You can always "
                         "reach Evan at evan@evanfischellconsulting.com.",
                         "action": None})
@@ -186,6 +205,7 @@ def agent_page():
         _pages[pid] = {"html": html, "ts": time.time()}
         return jsonify({"id": pid, "url": f"/p/{pid}"})
     except Exception:
+        traceback.print_exc()
         return jsonify({"error": "generation failed"}), 502
 
 
@@ -197,6 +217,37 @@ def page(pid):
                 "make you a fresh one."), 404
     return entry["html"], 200, {"Content-Type": "text/html; charset=utf-8",
                                 "X-Robots-Tag": "noindex, nofollow"}
+
+
+FAVICON_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+               '<rect width="64" height="64" rx="14" fill="#0F2233"/>'
+               '<text x="27" y="42" font-family="Segoe UI,system-ui,sans-serif" '
+               'font-size="26" font-weight="600" fill="#F4F7F9" text-anchor="middle">EF</text>'
+               '<circle cx="48" cy="40" r="5" fill="#E8912A"/></svg>')
+
+
+@app.get("/favicon.ico")
+@app.get("/favicon.svg")
+def favicon():
+    return FAVICON_SVG, 200, {"Content-Type": "image/svg+xml",
+                              "Cache-Control": "public, max-age=86400"}
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return ("""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>Evan Fischell Consulting</title></head>
+<body style="margin:0;background:#F4F7F9;color:#0F2233;font-family:'IBM Plex Sans','Segoe UI',system-ui,sans-serif">
+<div style="max-width:560px;margin:18vh auto 0;padding:0 24px">
+<div style="font-size:15px;margin-bottom:28px"><b style="font-weight:600">Evan Fischell</b>
+<span style="font-weight:300">Consulting</span><span style="color:#E8912A;font-weight:600">.</span></div>
+<div style="height:2px;width:44px;background:#E8912A;margin-bottom:16px"></div>
+<h1 style="font-size:26px;font-weight:600;margin:0 0 12px">That page doesn't exist.</h1>
+<p style="color:#34505F;font-size:15.5px;line-height:1.6">But the agent on the
+<a href="/" style="color:#C1731A;font-weight:600;text-decoration:none;border-bottom:1px solid #E8912A">home page</a>
+is good at finding what you actually needed.</p>
+</div></body></html>""", 404, {"Content-Type": "text/html; charset=utf-8"})
 
 
 @app.get("/api/health")

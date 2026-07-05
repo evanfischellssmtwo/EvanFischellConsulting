@@ -78,8 +78,9 @@ slides:
           - t: "What changes"
             list: ["No license. No lock-in.", "No integration treadmill.", "Built to your need — and able to scale when you want it to."]
           - t: "Our perspective"
-            # Evan (2026-07-02): abundance confidence — speed means no need for after-work / follow-on sales. Weave this theme through the deck.
-            list: ["Agentic engineering makes us 10–100× faster — so we're never worried about where the next engagement comes from.", "That means nothing we build is designed to create dependency: no lock-in, no padded scope, no follow-on sale engineered into the work.", "And where a vendor is genuinely worth keeping, we say so."]
+            # Evan (2026-07-02): abundance confidence, stated POSITIVELY (no negative terms about ourselves or others — no "trap"/"dependency"/"padded scope").
+            # "10–100×" is TECH REGISTER ONLY. Shared/exec surfaces say "we are fast" + "solving problems and delivering ROI is our business model."
+            list: ["Agentic engineering makes us 10–100× faster — we're never worried about where the next engagement comes from.", "We build exactly what solves your problem, you own it, and delivering ROI is what earns us the next one.", "And where a vendor is genuinely worth keeping, we say so."]
       exec:
         headline: "A fraction of the cost. A few weeks. Yours."
         body: "We replace the vendor product with a system that does exactly what your operation needs — then hand it over. Your team runs it. The license bills stop."
@@ -87,7 +88,7 @@ slides:
           - t: "What it means for the budget"
             p: "One engagement instead of a perpetual license. The integration treadmill ends, and the spend becomes an asset you own instead of a subscription you endure."
           - t: "What it means for accountability"
-            p: "One accountable partner, problems solved in weeks, and a straight answer at every step. We can afford that honesty: we work fast enough that we never need to manufacture follow-on work — where a vendor is genuinely worth keeping, we say so."
+            p: "One accountable partner, problems solved in weeks, and a straight answer at every step. We can afford that honesty — solving problems and delivering ROI is our business model — so where a vendor is genuinely worth keeping, we say so."
 
   - id: how-it-runs
     kicker: "How an engagement runs"
@@ -123,7 +124,7 @@ slides:
     # cards 1–2 shared; card 3 differs by audience (exec version stays positive — no "rip and replace")
     steps_shared:
       - t: "Another platform"
-        p: "We exist to reduce the number of platforms you pay for. Our speed is our security — we don't need lock-in or follow-on sales to keep busy. You own what we build, and we're happy to maintain it: 100% coverage, or exactly as much support as your team needs."
+        p: "We exist to reduce the number of platforms you pay for. Solving problems and delivering ROI is our business model — and there will always be more problems worth solving. You own what we build, and we're happy to maintain it: 100% coverage, or exactly as much support as your team needs."
       - t: "A \"turnkey\" solution"
         p: "One size does not fit all — and with the technology available today, it doesn't have to. Everything we deliver is built to your need, not to a market's average."
     variants:
@@ -175,8 +176,8 @@ slides:
         p: "By week 4–6 the first problem is solved and demonstrable — spending down, complexity down. Proof, not promises."
       - t: "Native to the agentic-engineering era"
         p: "Built in this era, not retrofitted to it — which is why we deliver at a speed and cost incumbents can't match."
-      - t: "We don't need to trap you"
-        p: "Being 10–100× faster means we're confident there will always be more problems worth solving. Nothing we build is designed for dependency — no platform to upsell, no scope padded to create after-work."
+      - t: "Solving problems and delivering ROI is our business model."   # amber period on the title (brand device)
+        p: "We are fast, and we deliver real results. That keeps the incentives simple: the way we earn the next engagement is by making this one pay off."
       - t: "Healthcare-focused from day one"
         p: "Compliance and clinical-adjacent constraints are the starting point, not an adaptation."
 
