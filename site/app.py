@@ -1,9 +1,12 @@
 """Evan Fischell Consulting — public landing site + embedded agent (efc-site)."""
 import json
+import logging
+import os
 import re
 import secrets as pysecrets
+import threading
 import time
-import traceback
+from html.parser import HTMLParser
 from pathlib import Path
 
 from flask import Flask, jsonify, redirect, request, send_from_directory
@@ -17,16 +20,19 @@ REDIRECT_HOSTS = {
     "www.evanfischellconsulting.com",
 }
 
-MODEL = "gemini-3.1-pro-preview"
-CHAT_DAILY_CAP = 200
-PAGE_DAILY_CAP = 15
+MODEL = os.getenv("EFC_MODEL", "gemini-3.1-pro-preview")
+CHAT_DAILY_CAP = int(os.getenv("CHAT_DAILY_CAP", "200"))
+PAGE_DAILY_CAP = int(os.getenv("PAGE_DAILY_CAP", "15"))
 MAX_TURNS = 16
 MAX_MSG_CHARS = 2000
 MAX_PAGES_STORED = 100
 
 _usage = {"day": None, "chat": 0, "page": 0}
+_usage_lock = threading.Lock()
 _pages = {}  # id -> {"html": str, "ts": float}
+_pages_lock = threading.Lock()
 _kb_cache = None
+logger = logging.getLogger(__name__)
 
 
 def _kb():
@@ -37,13 +43,109 @@ def _kb():
 
 
 def _spend(kind, cap):
-    today = time.strftime("%Y-%m-%d")
-    if _usage["day"] != today:
-        _usage.update(day=today, chat=0, page=0)
-    if _usage[kind] >= cap:
-        return False
-    _usage[kind] += 1
-    return True
+    with _usage_lock:
+        today = time.strftime("%Y-%m-%d")
+        if _usage["day"] != today:
+            _usage.update(day=today, chat=0, page=0)
+        if _usage[kind] >= cap:
+            return False
+        _usage[kind] += 1
+        return True
+
+
+def _normalize_messages(data):
+    if not isinstance(data, dict):
+        raise ValueError("JSON object required")
+    messages = data.get("messages")
+    if not isinstance(messages, list) or not messages:
+        raise ValueError("messages required")
+    contents = []
+    for message in messages[-MAX_TURNS:]:
+        if not isinstance(message, dict):
+            raise ValueError("each message must be an object")
+        role = message.get("role")
+        if role not in {"user", "model"}:
+            raise ValueError("message role must be user or model")
+        text = message.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("message text required")
+        contents.append({"role": role, "parts": [{"text": text[:MAX_MSG_CHARS]}]})
+    return contents
+
+
+def _parse_chat_response(raw):
+    raw = (raw or "").strip()
+    out = None
+    for candidate in (raw, raw + "}", raw + "}}"):
+        try:
+            out = json.loads(candidate)
+            break
+        except json.JSONDecodeError:
+            continue
+    if out is None:
+        match = re.search(r'"reply"\s*:\s*"((?:[^"\\]|\\.)*)"', raw, re.S)
+        if match:
+            out = {"reply": json.loads('"' + match.group(1) + '"'), "action": None}
+        else:
+            match = re.search(r"\{.*\}", raw, re.S)
+            try:
+                out = json.loads(match.group(0)) if match else {"reply": raw, "action": None}
+            except json.JSONDecodeError:
+                out = {"reply": raw, "action": None}
+    if isinstance(out, list):
+        out = next((item for item in out if isinstance(item, dict)), None) or {"reply": raw}
+    if not isinstance(out, dict):
+        out = {"reply": str(out)}
+    reply = str(out.get("reply") or "").strip() or "Sorry — I lost my train of thought. Try again?"
+    action = out.get("action") if isinstance(out.get("action"), dict) else None
+    if action:
+        brief = action.get("brief")
+        if action.get("type") != "create_page" or not isinstance(brief, str) or not brief.strip():
+            action = None
+        else:
+            action = {"type": "create_page", "brief": brief[:2000]}
+    return {"reply": reply, "action": action}
+
+
+class _GeneratedPageValidator(HTMLParser):
+    BLOCKED_TAGS = {"script", "iframe", "embed", "object", "form", "base"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.errors = []
+        self.has_html = False
+        self.has_noindex = False
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        attributes = {name.lower(): (value or "") for name, value in attrs}
+        self.has_html |= tag == "html"
+        if tag in self.BLOCKED_TAGS:
+            self.errors.append(f"blocked tag: {tag}")
+        if any(name.startswith("on") for name in attributes):
+            self.errors.append("event handler attributes are blocked")
+        for name in ("href", "src", "action", "formaction"):
+            value = attributes.get(name, "").strip().lower()
+            if value.startswith(("http:", "https:", "//", "javascript:", "data:")):
+                self.errors.append(f"external or active {name} is blocked")
+        if tag == "meta" and attributes.get("name", "").lower() == "robots":
+            content = attributes.get("content", "").lower()
+            self.has_noindex |= "noindex" in content
+
+
+def _validate_generated_html(html):
+    parser = _GeneratedPageValidator()
+    try:
+        parser.feed(html)
+        parser.close()
+    except Exception as exc:
+        raise ValueError("malformed generated HTML") from exc
+    if not parser.has_html:
+        parser.errors.append("html element required")
+    if not parser.has_noindex:
+        parser.errors.append("noindex metadata required")
+    if parser.errors:
+        raise ValueError("; ".join(parser.errors))
 
 
 def _client():
@@ -118,19 +220,14 @@ def deck():
 
 @app.post("/api/agent/chat")
 def agent_chat():
+    try:
+        contents = _normalize_messages(request.get_json(silent=True))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     if not _spend("chat", CHAT_DAILY_CAP):
         return jsonify({"reply": "I've hit my conversation limit for today — "
                         "please reach Evan directly at evan@evanfischellconsulting.com.",
-                        "action": None})
-    data = request.get_json(silent=True) or {}
-    msgs = data.get("messages") or []
-    if not isinstance(msgs, list) or not msgs:
-        return jsonify({"error": "messages required"}), 400
-    contents = []
-    for m in msgs[-MAX_TURNS:]:
-        role = "user" if m.get("role") == "user" else "model"
-        text = str(m.get("text") or "")[:MAX_MSG_CHARS]
-        contents.append({"role": role, "parts": [{"text": text}]})
+                        "action": None}), 429
     try:
         from google.genai import types
         resp = _client().models.generate_content(
@@ -143,46 +240,24 @@ def agent_chat():
                 thinking_config=types.ThinkingConfig(thinking_budget=2048),
             ),
         )
-        raw = (resp.text or "").strip()
-        out = None
-        for candidate in (raw, raw + "}", raw + "}}"):
-            try:
-                out = json.loads(candidate)
-                break
-            except Exception:
-                continue
-        if out is None:
-            m = re.search(r'"reply"\s*:\s*"((?:[^"\\]|\\.)*)"', raw, re.S)
-            if m:
-                out = {"reply": json.loads('"' + m.group(1) + '"'), "action": None}
-            else:
-                m = re.search(r"\{.*\}", raw, re.S)
-                out = json.loads(m.group(0)) if m else {"reply": raw, "action": None}
-        if isinstance(out, list):
-            out = next((x for x in out if isinstance(x, dict)), None) or {"reply": raw, "action": None}
-        if not isinstance(out, dict):
-            out = {"reply": str(out), "action": None}
-        reply = str(out.get("reply") or "").strip() or (
-            "Sorry — I lost my train of thought. Try again?")
-        action = out.get("action") if isinstance(out.get("action"), dict) else None
-        if action and action.get("type") != "create_page":
-            action = None
-        return jsonify({"reply": reply, "action": action})
+        return jsonify(_parse_chat_response(resp.text))
     except Exception:
-        traceback.print_exc()
+        logger.exception("chat generation failed")
         return jsonify({"reply": "Something went wrong on my end. You can always "
                         "reach Evan at evan@evanfischellconsulting.com.",
-                        "action": None})
+                        "action": None}), 502
 
 
 @app.post("/api/agent/page")
 def agent_page():
-    if not _spend("page", PAGE_DAILY_CAP):
-        return jsonify({"error": "page limit reached for today"}), 429
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON object required"}), 400
     brief = str(data.get("brief") or "").strip()[:2000]
     if not brief:
         return jsonify({"error": "brief required"}), 400
+    if not _spend("page", PAGE_DAILY_CAP):
+        return jsonify({"error": "page limit reached for today"}), 429
     try:
         from google.genai import types
         resp = _client().models.generate_content(
@@ -196,27 +271,29 @@ def agent_page():
         )
         html = (resp.text or "").strip()
         html = re.sub(r"^```(?:html)?\s*|\s*```$", "", html)
-        if "<html" not in html.lower():
-            return jsonify({"error": "generation failed"}), 502
+        _validate_generated_html(html)
         pid = pysecrets.token_urlsafe(8)
-        if len(_pages) >= MAX_PAGES_STORED:
-            oldest = min(_pages, key=lambda k: _pages[k]["ts"])
-            _pages.pop(oldest, None)
-        _pages[pid] = {"html": html, "ts": time.time()}
+        with _pages_lock:
+            if len(_pages) >= MAX_PAGES_STORED:
+                oldest = min(_pages, key=lambda k: _pages[k]["ts"])
+                _pages.pop(oldest, None)
+            _pages[pid] = {"html": html, "ts": time.time()}
         return jsonify({"id": pid, "url": f"/p/{pid}"})
     except Exception:
-        traceback.print_exc()
+        logger.exception("page generation failed")
         return jsonify({"error": "generation failed"}), 502
 
 
 @app.get("/p/<pid>")
 def page(pid):
-    entry = _pages.get(pid)
+    with _pages_lock:
+        entry = _pages.get(pid)
     if not entry:
         return ("This page has expired. Ask the agent on the home page to "
                 "make you a fresh one."), 404
     return entry["html"], 200, {"Content-Type": "text/html; charset=utf-8",
-                                "X-Robots-Tag": "noindex, nofollow"}
+                                "X-Robots-Tag": "noindex, nofollow",
+                                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"}
 
 
 FAVICON_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
@@ -252,8 +329,7 @@ is good at finding what you actually needed.</p>
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "efc-site", "agent": True,
-            "usage": {k: _usage[k] for k in ("day", "chat", "page")}}
+    return {"ok": True, "service": "efc-site", "agent": True}
 
 
 if __name__ == "__main__":
