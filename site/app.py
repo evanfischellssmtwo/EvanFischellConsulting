@@ -206,6 +206,20 @@ def canonicalize():
     return None
 
 
+@app.after_request
+def prevent_search_indexing(response):
+    # Crawlers must be able to fetch pages to observe this directive. Keep
+    # robots.txt crawlable; blocking the site there can preserve known URLs in
+    # search results because the crawler cannot see the noindex response.
+    response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return response
+
+
+@app.get("/robots.txt")
+def robots():
+    return "User-agent: *\nAllow: /\n", 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
 @app.get("/")
 def index():
     return send_from_directory(app.root_path, "index.html")

@@ -60,7 +60,7 @@ def test_generated_page_has_security_headers(client):
     efc._pages["safe"] = {"html": "<html></html>", "ts": 0}
     response = client.get("/p/safe")
     assert response.status_code == 200
-    assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
+    assert response.headers["X-Robots-Tag"] == "noindex, nofollow, noarchive"
     assert "default-src 'none'" in response.headers["Content-Security-Policy"]
 
 
@@ -72,6 +72,20 @@ def test_page_generation_validates_before_quota(client):
 
 def test_health_does_not_expose_usage(client):
     assert client.get("/api/health").json == {"ok": True, "service": "efc-site", "agent": True}
+
+
+@pytest.mark.parametrize("path", ["/", "/deck", "/missing", "/api/health"])
+def test_site_responses_prevent_search_indexing(client, path):
+    response = client.get(path)
+    assert response.headers["X-Robots-Tag"] == "noindex, nofollow, noarchive"
+
+
+def test_robots_allows_crawlers_to_observe_noindex(client):
+    response = client.get("/robots.txt")
+    assert response.status_code == 200
+    assert response.content_type == "text/plain; charset=utf-8"
+    assert response.get_data(as_text=True) == "User-agent: *\nAllow: /\n"
+    assert "Disallow: /" not in response.get_data(as_text=True)
 
 
 def test_canonical_redirect_preserves_query(client):
