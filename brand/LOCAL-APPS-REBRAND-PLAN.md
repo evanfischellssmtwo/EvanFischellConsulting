@@ -37,9 +37,9 @@ Source of truth for tokens/voice: `EvanFischellConsulting/brand/BRANDING-PLAN.md
 | Per-app CSS | `claude.css` (WorkApps, HatchControl), `styles.css` (LocalLLM), `shows.css`/`quick.css`/`pc.css` (HatchControl) | Per-repo |
 | Chrome contract tests | `services/{Svc}/tests/integration/test_*_smoke.py` | Per-repo — **currently assert the terracotta token `--accent:#d97757`** |
 
-Vendored chrome copies (9): ApiObservatory, FreshbooksIntegration, HatchControl
+Vendored chrome copies (7): ApiObservatory, HatchControl
 (`src/home_control/static/`), LocalLLM, LogViewer, PayrollCalculator, SecretVault
-(`src/secret_vault_portal/static/`), SkillsTopology, WorkApps (`src/work_apps/static/`).
+(`src/secret_vault_portal/static/`), WorkApps (`src/work_apps/static/`).
 AppDirectory generates its own chrome'd HTML and serves the banner.
 
 **Deploy constraint (non-negotiable, per efisch-cicd):** every change lands on each repo's
@@ -130,9 +130,9 @@ Repo scope: `templates/efisch-frontend-template` + `services/AppDirectory`.
 **GATE → Evan reviews the preview and the hub on the dev plane. No fan-out until approved.**
 (This is the one aesthetic judgment call; everything after is mechanical propagation.)
 
-### Phase 1 — Service fan-out (sonnet swarm, one agent per repo; 9 parallel agents)
-Repos: ApiObservatory, FreshbooksIntegration, HatchControl, LocalLLM, LogViewer,
-PayrollCalculator, SecretVault, SkillsTopology, WorkApps.
+### Phase 1 — Service fan-out (sonnet swarm, one agent per repo; 7 parallel agents)
+Repos: ApiObservatory, HatchControl, LocalLLM, LogViewer, PayrollCalculator,
+SecretVault, WorkApps.
 
 Each agent, in its own repo, on `dev`:
 1. Vendor the approved `chrome.css` + `chrome.js` from the template into the app's
@@ -214,4 +214,3 @@ defect list; failures loop back to the repo agent (max 2 repair rounds).
 | Hub-served fonts as single point of failure | System-sans fallback stacks in chrome.css |
 | App-specific CSS fights new tokens (contrast bugs) | Phase 2 verifier checks every page in light + dark; repair loop |
 | Amber overuse (brand rule violation) | Explicit ≤10% rule in every prompt; verifier checks accent usage |
-| SkillsTopology has no GitHub repo / CI (discovered in Phase 1) | Rebrand committed on local dev; terracotta-in-decimal-RGB fixed in repair; CI/CD onboarding backlogged as a separate decision — it CANNOT ship via Phase 4's PR flow until onboarded |
