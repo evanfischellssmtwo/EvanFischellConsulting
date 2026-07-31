@@ -232,6 +232,13 @@ def deck():
     return send_from_directory(app.root_path, "deck.html")
 
 
+@app.get("/resume")
+def resume():
+    # Unlisted, like /deck: nothing links here; the page carries noindex.
+    # Interactive resume that prints as a two-page document.
+    return send_from_directory(app.root_path, "resume.html")
+
+
 @app.post("/api/agent/chat")
 def agent_chat():
     try:
