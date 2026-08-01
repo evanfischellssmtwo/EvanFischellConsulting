@@ -14,8 +14,11 @@ spec.loader.exec_module(efc)
 
 @pytest.fixture(autouse=True)
 def reset_state():
-    efc._usage.update(day=None, chat=0, page=0)
+    efc._usage.update(day=None, chat=0, page=0, feedback=0)
     efc._pages.clear()
+    efc._feedback_mem.clear()
+    efc.FEEDBACK_KEY = ""
+    efc.FEEDBACK_BUCKET = ""
 
 
 @pytest.fixture
@@ -43,6 +46,49 @@ def test_chat_parser_repairs_truncated_object():
 def test_chat_parser_normalizes_action():
     result = efc._parse_chat_response('{"reply":"ok","action":{"type":"create_page","brief":"brief"}}')
     assert result["action"] == {"type": "create_page", "brief": "brief"}
+
+
+def test_chat_parser_normalizes_feedback_action():
+    result = efc._parse_chat_response(
+        '{"reply":"saved","action":{"type":"save_feedback","note":"tighten the bullets","about":"resume"}}')
+    assert result["action"] == {"type": "save_feedback", "note": "tighten the bullets", "about": "resume"}
+
+
+@pytest.mark.parametrize("action", [
+    '{"type":"save_feedback","note":"   "}',
+    '{"type":"save_feedback"}',
+    '{"type":"delete_everything","note":"x"}',
+])
+def test_chat_parser_rejects_bad_actions(action):
+    assert efc._parse_chat_response('{"reply":"ok","action":%s}' % action)["action"] is None
+
+
+def test_feedback_requires_note_before_quota(client):
+    response = client.post("/api/agent/feedback", json={"note": "  "})
+    assert response.status_code == 400
+    assert efc._usage["feedback"] == 0
+
+
+def test_feedback_saves_and_review_requires_key(client):
+    saved = client.post("/api/agent/feedback", json={"note": "headshot is too big", "about": "resume: hero"})
+    assert saved.status_code == 200
+    assert len(efc._feedback_mem) == 1
+
+    assert client.get("/feedback").status_code == 404
+    assert client.get("/feedback?key=wrong").status_code == 404
+
+    efc.FEEDBACK_KEY = "secret-key"
+    page = client.get("/feedback?key=secret-key")
+    assert page.status_code == 200
+    assert "headshot is too big" in page.get_data(as_text=True)
+
+
+def test_feedback_review_escapes_entries(client):
+    client.post("/api/agent/feedback", json={"note": "<script>alert(1)</script>", "about": "x"})
+    efc.FEEDBACK_KEY = "secret-key"
+    body = client.get("/feedback?key=secret-key").get_data(as_text=True)
+    assert "<script>alert(1)</script>" not in body
+    assert "&lt;script&gt;" in body
 
 
 @pytest.mark.parametrize("html", [

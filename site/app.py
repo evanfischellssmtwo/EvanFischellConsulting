@@ -1,4 +1,6 @@
 """Evan Fischell Consulting — public landing site + embedded agent (efc-site)."""
+import hmac
+import html as htmllib
 import json
 import logging
 import os
@@ -23,14 +25,24 @@ REDIRECT_HOSTS = {
 MODEL = os.getenv("EFC_MODEL", "gemini-3.1-pro-preview")
 CHAT_DAILY_CAP = int(os.getenv("CHAT_DAILY_CAP", "200"))
 PAGE_DAILY_CAP = int(os.getenv("PAGE_DAILY_CAP", "15"))
+FEEDBACK_DAILY_CAP = int(os.getenv("FEEDBACK_DAILY_CAP", "100"))
 MAX_TURNS = 16
 MAX_MSG_CHARS = 2000
 MAX_PAGES_STORED = 100
+MAX_FEEDBACK_CHARS = 2000
+MAX_FEEDBACK_MEM = 500
 
-_usage = {"day": None, "chat": 0, "page": 0}
+# Durable feedback lives in this GCS bucket when set; otherwise entries stay in
+# memory and are lost on restart (fine for local dev and tests).
+FEEDBACK_BUCKET = os.getenv("FEEDBACK_BUCKET", "")
+FEEDBACK_KEY = os.getenv("FEEDBACK_KEY", "")
+
+_usage = {"day": None, "chat": 0, "page": 0, "feedback": 0}
 _usage_lock = threading.Lock()
 _pages = {}  # id -> {"html": str, "ts": float}
 _pages_lock = threading.Lock()
+_feedback_mem = []
+_feedback_lock = threading.Lock()
 _kb_cache = None
 logger = logging.getLogger(__name__)
 
@@ -46,11 +58,39 @@ def _spend(kind, cap):
     with _usage_lock:
         today = time.strftime("%Y-%m-%d")
         if _usage["day"] != today:
-            _usage.update(day=today, chat=0, page=0)
+            _usage.update(day=today, chat=0, page=0, feedback=0)
         if _usage[kind] >= cap:
             return False
         _usage[kind] += 1
         return True
+
+
+def _bucket():
+    from google.cloud import storage
+    return storage.Client().bucket(FEEDBACK_BUCKET)
+
+
+def _save_feedback(entry):
+    if FEEDBACK_BUCKET:
+        blob = _bucket().blob(f"feedback/{entry['ts']:.0f}-{entry['id']}.json")
+        blob.upload_from_string(json.dumps(entry), content_type="application/json")
+        return
+    with _feedback_lock:
+        _feedback_mem.append(entry)
+        del _feedback_mem[:-MAX_FEEDBACK_MEM]
+
+
+def _list_feedback():
+    if FEEDBACK_BUCKET:
+        entries = []
+        for blob in _bucket().list_blobs(prefix="feedback/"):
+            try:
+                entries.append(json.loads(blob.download_as_bytes()))
+            except (ValueError, UnicodeDecodeError):
+                logger.warning("skipping unreadable feedback blob %s", blob.name)
+        return sorted(entries, key=lambda e: e.get("ts", 0), reverse=True)
+    with _feedback_lock:
+        return sorted(_feedback_mem, key=lambda e: e.get("ts", 0), reverse=True)
 
 
 def _normalize_messages(data):
@@ -97,14 +137,28 @@ def _parse_chat_response(raw):
     if not isinstance(out, dict):
         out = {"reply": str(out)}
     reply = str(out.get("reply") or "").strip() or "Sorry — I lost my train of thought. Try again?"
-    action = out.get("action") if isinstance(out.get("action"), dict) else None
-    if action:
-        brief = action.get("brief")
-        if action.get("type") != "create_page" or not isinstance(brief, str) or not brief.strip():
-            action = None
-        else:
-            action = {"type": "create_page", "brief": brief[:2000]}
+    action = _normalize_action(out.get("action"))
     return {"reply": reply, "action": action}
+
+
+def _normalize_action(action):
+    if not isinstance(action, dict):
+        return None
+    kind = action.get("type")
+    if kind == "create_page":
+        brief = action.get("brief")
+        if isinstance(brief, str) and brief.strip():
+            return {"type": "create_page", "brief": brief[:2000]}
+    elif kind == "save_feedback":
+        note = action.get("note")
+        if isinstance(note, str) and note.strip():
+            about = action.get("about")
+            return {
+                "type": "save_feedback",
+                "note": note[:MAX_FEEDBACK_CHARS],
+                "about": about[:200] if isinstance(about, str) else "",
+            }
+    return None
 
 
 class _GeneratedPageValidator(HTMLParser):
@@ -157,13 +211,24 @@ CHAT_PROTOCOL = """
 
 ## Response protocol (strict)
 Respond with ONLY a JSON object: {"reply": "<your message to the visitor>",
-"action": null}. When the visitor explicitly asks you to create a page or
-website (an explicit request counts as agreement), or has clearly agreed to
-your offer of one, set "action" to {"type": "create_page", "brief": "<one
-paragraph describing what the page should be — the visitor's request, their
-role/situation if relevant, and what it should cover>"} and keep "reply"
-short (tell them the page is being prepared). Keep replies under 160 words.
-Plain text only in reply — no markdown headings, no bullets unless brief.
+"action": null}. Keep replies under 160 words. Plain text only in reply — no
+markdown headings, no bullets unless brief.
+
+Set "action" when one of these applies:
+
+- The visitor explicitly asks you to create a page or website (an explicit
+  request counts as agreement), or clearly agrees to your offer of one:
+  {"type": "create_page", "brief": "<one paragraph describing what the page
+  should be — the visitor's request, their role/situation if relevant, and
+  what it should cover>"}. Keep "reply" short (tell them it's being prepared).
+- The visitor gives feedback, a critique, a correction, or a suggestion about
+  the résumé or this site — including praise worth passing on:
+  {"type": "save_feedback", "note": "<their point in their own words, plus any
+  context needed to act on it>", "about": "<the section or element it concerns,
+  e.g. 'resume: SSM Health bullets' or 'resume: headshot'>"}. Confirm plainly
+  in "reply" that you have saved it for Evan. Save it whether the visitor is a
+  stranger or Evan himself; never argue with the critique, and never claim you
+  will change the page yourself — you record it, Evan decides.
 """
 
 PAGE_SYS = """You generate a single, complete, self-contained HTML page for a
@@ -303,6 +368,87 @@ def agent_page():
     except Exception:
         logger.exception("page generation failed")
         return jsonify({"error": "generation failed"}), 502
+
+
+@app.post("/api/agent/feedback")
+def agent_feedback():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON object required"}), 400
+    note = str(data.get("note") or "").strip()[:MAX_FEEDBACK_CHARS]
+    if not note:
+        return jsonify({"error": "note required"}), 400
+    if not _spend("feedback", FEEDBACK_DAILY_CAP):
+        return jsonify({"error": "feedback limit reached for today"}), 429
+    entry = {
+        "id": pysecrets.token_urlsafe(6),
+        "ts": time.time(),
+        "when": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()),
+        "note": note,
+        "about": str(data.get("about") or "").strip()[:200],
+        "page": str(data.get("page") or "").strip()[:200],
+    }
+    try:
+        _save_feedback(entry)
+    except Exception:
+        logger.exception("feedback save failed")
+        return jsonify({"error": "save failed"}), 502
+    return jsonify({"ok": True, "id": entry["id"]})
+
+
+FEEDBACK_STYLE = (
+    "body{margin:0;background:#F4F7F9;color:#0F2233;"
+    "font-family:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;line-height:1.6}"
+    ".w{max-width:760px;margin:0 auto;padding:34px 24px 60px}"
+    ".wm{font-size:14px;margin-bottom:26px}.wm b{font-weight:600}"
+    ".r{height:2px;width:44px;background:#E8912A;border:0;margin:0 0 16px}"
+    "h1{font-size:26px;font-weight:600;margin:0 0 6px}"
+    ".sub{color:#34505F;font-size:14px;margin:0 0 24px}"
+    ".e{background:#fff;border:1px solid #DDE5EA;border-radius:12px;padding:14px 16px;margin-bottom:12px}"
+    ".m{font-size:11.5px;color:#5A7180;letter-spacing:.02em;margin-bottom:6px}"
+    ".m b{color:#C1731A;font-weight:600}"
+    ".n{font-size:14.5px;color:#24404F;white-space:pre-wrap;overflow-wrap:break-word}"
+    ".none{color:#5A7180;font-size:14.5px}"
+)
+
+
+@app.get("/feedback")
+def feedback_review():
+    key = request.args.get("key", "")
+    if not FEEDBACK_KEY or not hmac.compare_digest(key, FEEDBACK_KEY):
+        return not_found(None)
+    try:
+        entries = _list_feedback()
+    except Exception:
+        logger.exception("feedback listing failed")
+        entries = None
+    if entries is None:
+        body = '<p class="none">Could not read the feedback store.</p>'
+    elif not entries:
+        body = '<p class="none">No feedback yet.</p>'
+    else:
+        body = "".join(
+            '<div class="e"><div class="m">{when}{about}</div><div class="n">{note}</div></div>'.format(
+                when=htmllib.escape(entry.get("when", "")),
+                about=(" · <b>" + htmllib.escape(entry["about"]) + "</b>") if entry.get("about") else "",
+                note=htmllib.escape(entry.get("note", "")),
+            )
+            for entry in entries
+        )
+    count = len(entries) if entries else 0
+    page = (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<meta name="robots" content="noindex, nofollow"><title>Feedback</title>'
+        f"<style>{FEEDBACK_STYLE}</style></head><body><div class=\"w\">"
+        '<div class="wm"><b>Evan Fischell</b> <span style="font-weight:300">Consulting</span>'
+        '<span style="color:#E8912A;font-weight:600">.</span></div>'
+        '<hr class="r"><h1>Feedback</h1>'
+        f'<p class="sub">{count} entr{"y" if count == 1 else "ies"}, newest first. '
+        "Saved by the embedded agent when a visitor critiques the résumé.</p>"
+        f"{body}</div></body></html>"
+    )
+    return page, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 @app.get("/p/<pid>")

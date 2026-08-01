@@ -479,6 +479,15 @@
       .then(function(j){
         thinking.textContent=j.reply||'Hmm — try that again?';
         history.push({role:'agent',text:j.reply||''});
+        if(j.action&&j.action.type==='save_feedback'&&j.action.note){
+          fetch('/api/agent/feedback',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({note:j.action.note,about:j.action.about||'',page:location.pathname})})
+            .then(function(r){return r.json();})
+            .then(function(p){
+              if(!p||!p.ok){add('agent','I could not save that just now — please send it to evan@evanfischellconsulting.com.');}
+            })
+            .catch(function(){add('agent','I could not save that just now — please send it to evan@evanfischellconsulting.com.');});
+        }
         if(j.action&&j.action.type==='create_page'&&j.action.brief){
           var w=add('agent','Building your page…');
           fetch('/api/agent/page',{method:'POST',headers:{'Content-Type':'application/json'},
