@@ -1,4 +1,5 @@
 import importlib.util
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -120,10 +121,64 @@ def test_health_does_not_expose_usage(client):
     assert client.get("/api/health").json == {"ok": True, "service": "efc-site", "agent": True}
 
 
-@pytest.mark.parametrize("path", ["/", "/deck", "/missing", "/api/health"])
+@pytest.mark.parametrize(
+    "path",
+    ["/", "/deck", "/pilot-tco", "/vendor-ai-review", "/vendor-ai-questionnaire",
+     "/missing", "/api/health"],
+)
 def test_site_responses_prevent_search_indexing(client, path):
     response = client.get(path)
     assert response.headers["X-Robots-Tag"] == "noindex, nofollow, noarchive"
+
+
+
+def assert_self_contained(body):
+    """No CDN, no remote font, no third-party fetch.
+
+    Checks fetching constructs rather than the bare string "https://": the
+    injected brand token files legitimately carry source URLs in comments.
+    """
+    pattern = r"""(?:url\(|@import\s+|src=|href=)["']?\s*(?:https?:)?//[^"')\s>]+"""
+    remote = [r for r in re.findall(pattern, body) if "w3.org" not in r]
+    assert not remote, f"remote references found: {remote[:3]}"
+
+
+@pytest.fixture
+def served_client(client, monkeypatch):
+    """Client whose static pages actually resolve.
+
+    Loading app.py by file location leaves Flask's root_path at the process cwd
+    rather than site/, so every send_from_directory page 404s under the plain
+    ``client`` fixture. Pin it for tests that assert on served bytes.
+    """
+    monkeypatch.setattr(efc.app, "root_path", str(SITE))
+    return client
+
+
+def test_vendor_ai_review_is_served_and_undiscoverable(served_client):
+    """Unlisted: served on request, noindex in the page, and linked from nowhere."""
+    response = served_client.get("/vendor-ai-review")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert 'name="robots" content="noindex, nofollow, noarchive"' in body
+    assert "Vendor AI Evaluation" in body
+    assert_self_contained(body)
+
+    landing = served_client.get("/").get_data(as_text=True)
+    assert "vendor-ai-review" not in landing
+
+
+def test_vendor_ai_questionnaire_is_served_and_undiscoverable(served_client):
+    """Unlisted vendor-facing questionnaire: served on request, linked from nowhere."""
+    response = served_client.get("/vendor-ai-questionnaire")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert 'name="robots" content="noindex, nofollow, noarchive"' in body
+    assert "Tell us how your AI actually works" in body
+    assert_self_contained(body)
+
+    landing = served_client.get("/").get_data(as_text=True)
+    assert "vendor-ai-questionnaire" not in landing
 
 
 def test_robots_allows_crawlers_to_observe_noindex(client):
