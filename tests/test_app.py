@@ -28,6 +28,26 @@ def client():
     return efc.app.test_client()
 
 
+def test_evergreen_serves_and_rewrites_content(client, monkeypatch):
+    import io
+    content = io.BytesIO(b'<link href="/brand/efc.css"><a href="/downloads/evergreen-scope.pdf">PDF</a>')
+    content.headers = {"Content-Type": "text/html; charset=utf-8"}
+    monkeypatch.setattr(efc, "urlopen", lambda url, timeout: content)
+    response = client.get("/evergreen?url=https://example.com")
+    assert response.status_code == 200
+    assert "Location" not in response.headers
+    assert b'/evergreen/brand/efc.css' in response.data
+    assert b'/evergreen/scope.pdf' in response.data
+
+
+def test_evergreen_source_failure_is_not_a_redirect(client, monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise efc.URLError("unavailable")
+    monkeypatch.setattr(efc, "urlopen", unavailable)
+    assert client.get("/evergreen").status_code == 502
+    assert client.get("/evergreen/unknown").status_code == 404
+
+
 def test_invalid_chat_does_not_consume_quota(client):
     response = client.post("/api/agent/chat", json={"messages": []})
     assert response.status_code == 400
