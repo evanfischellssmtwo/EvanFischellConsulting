@@ -304,6 +304,30 @@ def resume():
     return send_from_directory(app.root_path, "resume.html")
 
 
+@app.get("/pilot-tco")
+def pilot_tco():
+    # Unlisted: interactive TCO model for agentic software engineering pilot.
+    return send_from_directory(app.root_path, "pilot-tco.html")
+
+
+@app.get("/vendor-ai-questionnaire")
+def vendor_ai_questionnaire():
+    # Unlisted: the wave-1 questionnaire we send TO a vendor before a purchase.
+    # Vendor-facing voice; carries the EFC / Evergreen brand toggle and the AI
+    # lab marks. Canonical source: PureFrontend/vendor-ai-screener (built from
+    # src/page.template.html by src/build.py) — re-copy before each deploy.
+    return send_from_directory(app.root_path, "vendor-ai-questionnaire.html")
+
+
+@app.get("/vendor-ai-review")
+def vendor_ai_review():
+    # Unlisted, like /deck and /resume: nothing links here; the page carries
+    # noindex. Vendor AI evaluation criteria and live governance scorecard.
+    # Canonical source: PureFrontend/vendor-ai-evaluation-scorecard (built from
+    # src/page.template.html by src/build.py) — re-copy before each deploy.
+    return send_from_directory(app.root_path, "vendor-ai-review.html")
+
+
 @app.post("/api/agent/chat")
 def agent_chat():
     try:

@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic SWE Pilot — Total Cost of Ownership (SSM Health)</title>
+<style>
+/* ============================================================================
+   Mission Intelligence — shared theme (product-native)
+   ----------------------------------------------------------------------------
+   Token-for-token match to the live SSM Health "Mission Intelligence" catalog
+   app (data-discovery-web-app, shadcn/ui + Tailwind). Reports themed with this
+   feel like part of the tool they launch from.
+
+   Self-contained: system font stack, no CDN, no webfont. Works offline / behind
+   CSP on the static Databricks App server.
+
+   Theming: light by default. Dark applies via `.dark` on <html> or <body>, OR
+   automatically via prefers-color-scheme when no explicit class is set.
+
+   Canonical source: app-databricks-html-reports/shared/mi-theme.css
+   ========================================================================== */
+
+:root{
+  /* --- core (light) — captured from the MI product --- */
+  --mi-background:#ffffff;
+  --mi-foreground:#020817;
+  --mi-card:#ffffff;
+  --mi-card-foreground:#020817;
+  --mi-popover:#ffffff;
+  --mi-popover-foreground:#020817;
+  --mi-primary:#12235e;              /* SSM navy — brand */
+  --mi-primary-foreground:#f8fafc;
+  --mi-secondary:#f1f5f9;
+  --mi-secondary-foreground:#0f172a;
+  --mi-muted:#f1f5f9;
+  --mi-muted-foreground:#64748b;
+  --mi-accent:#f1f5f9;
+  --mi-accent-foreground:#0f172a;
+  --mi-destructive:#ef4444;
+  --mi-destructive-foreground:#f8fafc;
+  --mi-success:#008936;
+  --mi-warning:#b45309;
+  --mi-border:#e2e8f0;
+  --mi-input:#e2e8f0;
+  --mi-ring:#12235e;
+
+  /* --- brand secondary accents (from the decks, harmonized) --- */
+  --mi-teal:#0e7490;
+  --mi-green:#008936;
+
+  /* --- chart series (light) --- */
+  --mi-chart-1:#e76e50;
+  --mi-chart-2:#2a9d90;
+  --mi-chart-3:#274754;
+  --mi-chart-4:#e8c468;
+  --mi-chart-5:#f4a462;
+
+  /* --- asset-type accents (base rgb; badges tint them) --- */
+  --mi-type-powerbi:236,192,48;      /* #ECC030 amber */
+  --mi-type-epic:175,42,104;         /* #AF2A68 magenta */
+  --mi-type-qlikview:0,137,54;       /* #008936 green */
+  --mi-type-external:8,145,178;      /* #0891B2 cyan */
+  --mi-type-databricks:37,99,217;    /* #2563D9 blue */
+
+  /* --- code panel (brand-matched, replaces github-dark) --- */
+  --mi-code-bg:#0b1626;
+  --mi-code-fg:#e2e8f0;
+  --mi-code-muted:#7c8aa5;
+  --mi-code-kw:#7cc4ff;              /* keywords */
+  --mi-code-str:#7fd6a0;            /* strings */
+  --mi-code-num:#e8c468;           /* numbers */
+  --mi-code-com:#5f6f8c;           /* comments */
+  --mi-code-fn:#c7a3ff;            /* functions */
+
+  /* --- shape / motion --- */
+  --mi-radius:.5rem;                /* 8px */
+  --mi-radius-sm:calc(var(--mi-radius) - 4px);
+  --mi-radius-lg:calc(var(--mi-radius) + 4px);
+  --mi-shadow:0 1px 2px rgba(2,8,23,.04), 0 1px 3px rgba(2,8,23,.06);
+  --mi-shadow-md:0 2px 4px rgba(2,8,23,.04), 0 8px 24px rgba(2,8,23,.08);
+  --mi-ring-shadow:0 0 0 2px var(--mi-background), 0 0 0 4px var(--mi-ring);
+
+  /* --- type --- */
+  --mi-font:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mi-mono:ui-monospace,SFMono-Regular,"Cascadia Code",Menlo,Consolas,monospace;
+
+  color-scheme:light;
+}
+
+/* dark — explicit class wins */
+.dark{
+  --mi-background:#020817;
+  --mi-foreground:#f8fafc;
+  --mi-card:#0a1324;
+  --mi-card-foreground:#f8fafc;
+  --mi-popover:#0a1324;
+  --mi-popover-foreground:#f8fafc;
+  --mi-primary:#f8fafc;              /* inverts: near-white becomes primary */
+  --mi-primary-foreground:#12235e;
+  --mi-secondary:#1e293b;
+  --mi-secondary-foreground:#f8fafc;
+  --mi-muted:#1e293b;
+  --mi-muted-foreground:#94a3b8;
+  --mi-accent:#1e293b;
+  --mi-accent-foreground:#f8fafc;
+  --mi-destructive:#7f1d1d;
+  --mi-destructive-foreground:#f8fafc;
+  --mi-success:#2eb88a;
+  --mi-warning:#e88c30;
+  --mi-border:#1e293b;
+  --mi-input:#1e293b;
+  --mi-ring:#cbd5e1;
+  --mi-teal:#2dd4bf;
+  --mi-green:#2eb88a;
+  --mi-chart-1:#2662d9; --mi-chart-2:#2eb88a; --mi-chart-3:#e88c30; --mi-chart-4:#af57db; --mi-chart-5:#e23670;
+  --mi-code-bg:#060c17;
+  --mi-shadow:0 1px 2px rgba(0,0,0,.4);
+  --mi-shadow-md:0 2px 4px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+/* auto dark when no explicit theme class is present on html/body */
+@media (prefers-color-scheme:dark){
+  :root:not(.light):not(.dark) body:not(.light):not(.dark){ }
+}
+
+/* ---------------------------------------------------------------- base ---- */
+*{box-sizing:border-box}
+html{ -webkit-text-size-adjust:100%; }
+body.mi{
+  margin:0;background:var(--mi-background);color:var(--mi-foreground);
+  font-family:var(--mi-font);font-size:15px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+.mi ::selection{background:color-mix(in srgb,var(--mi-primary) 22%,transparent)}
+.mi a{color:var(--mi-primary);text-decoration:none}
+.mi a:hover{text-decoration:underline}
+.mi h1,.mi h2,.mi h3,.mi h4{color:var(--mi-foreground);font-weight:700;letter-spacing:-.011em;line-height:1.2;margin:0}
+.mi h1{font-size:1.9rem}.mi h2{font-size:1.4rem}.mi h3{font-size:1.075rem}.mi h4{font-size:.95rem}
+.mi p{margin:.6rem 0}
+.mi small,.mi .mi-muted{color:var(--mi-muted-foreground)}
+.mi hr{border:none;border-top:1px solid var(--mi-border);margin:1.25rem 0}
+.mi :focus-visible{outline:none;box-shadow:var(--mi-ring-shadow);border-radius:var(--mi-radius-sm)}
+
+/* container */
+.mi-container{max-width:1040px;margin:0 auto;padding:0 20px}
+.mi-container--wide{max-width:1240px}
+
+/* ------------------------------------------------------------ top bar ---- */
+.mi-topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;
+  padding:10px 20px;background:color-mix(in srgb,var(--mi-background) 88%,transparent);
+  backdrop-filter:saturate(1.4) blur(8px);border-bottom:1px solid var(--mi-border)}
+.mi-brand{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--mi-primary);white-space:nowrap}
+.dark .mi-brand{color:var(--mi-foreground)}
+.mi-brand .mi-brand-mark{width:26px;height:26px;flex:0 0 auto}
+.mi-brand .mi-brand-name{display:flex;flex-direction:column;line-height:1.05}
+.mi-brand .mi-brand-name b{font-size:.95rem;letter-spacing:-.01em}
+.mi-brand .mi-brand-name span{font-size:.68rem;font-weight:700;color:var(--mi-muted-foreground);letter-spacing:.02em}
+.mi-topbar-spacer{flex:1}
+.mi-topbar-actions{display:flex;align-items:center;gap:8px}
+
+/* ------------------------------------------------------------- eyebrow --- */
+.mi-eyebrow{font-size:.72rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--mi-primary)}
+.dark .mi-eyebrow{color:var(--mi-teal)}
+
+/* -------------------------------------------------------------- cards ---- */
+.mi-card{background:var(--mi-card);color:var(--mi-card-foreground);
+  border:1px solid var(--mi-border);border-radius:var(--mi-radius);
+  box-shadow:var(--mi-shadow);padding:16px 18px}
+.mi-card--pad-lg{padding:22px 24px}
+.mi-card-hd{display:flex;align-items:flex-start;gap:10px;justify-content:space-between}
+.mi-card-title{font-weight:700;font-size:1.02rem}
+.mi-card-sub{color:var(--mi-muted-foreground);font-size:.85rem;margin-top:2px}
+.mi-grid{display:grid;gap:14px}
+.mi-grid--2{grid-template-columns:repeat(2,1fr)}
+.mi-grid--3{grid-template-columns:repeat(3,1fr)}
+.mi-grid--auto{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+@media(max-width:720px){.mi-grid--2,.mi-grid--3{grid-template-columns:1fr}}
+
+/* ------------------------------------------------------------- badges ---- */
+.mi-badge{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;
+  padding:2px 9px;border-radius:var(--mi-radius-sm);border:1px solid var(--mi-border);
+  background:var(--mi-secondary);color:var(--mi-secondary-foreground);white-space:nowrap}
+/* asset-type badges — product colour system */
+.mi-badge[data-type]{color:var(--mi-foreground)}
+.mi-badge[data-type="powerbi"]{background:rgba(var(--mi-type-powerbi),.16);border-color:rgba(var(--mi-type-powerbi),.5)}
+.mi-badge[data-type="epic"]{background:rgba(var(--mi-type-epic),.16);border-color:rgba(var(--mi-type-epic),.5)}
+.mi-badge[data-type="qlikview"]{background:rgba(var(--mi-type-qlikview),.16);border-color:rgba(var(--mi-type-qlikview),.5)}
+.mi-badge[data-type="external"]{background:rgba(var(--mi-type-external),.16);border-color:rgba(var(--mi-type-external),.5)}
+.mi-badge[data-type="databricks"]{background:rgba(var(--mi-type-databricks),.16);border-color:rgba(var(--mi-type-databricks),.5)}
+.dark .mi-badge[data-type]{color:var(--mi-foreground)}
+/* featured chip */
+.mi-chip{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:600;
+  padding:3px 10px;border-radius:999px;border:1px solid var(--mi-border);
+  background:var(--mi-card);color:var(--mi-muted-foreground)}
+.mi-chip--featured{color:var(--mi-primary);border-color:color-mix(in srgb,var(--mi-primary) 30%,var(--mi-border))}
+.dark .mi-chip--featured{color:var(--mi-teal)}
+
+/* ------------------------------------------------------------ buttons ---- */
+.mi-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;
+  font-family:inherit;font-size:.85rem;font-weight:600;line-height:1;
+  padding:9px 15px;border-radius:var(--mi-radius-sm);border:1px solid transparent;
+  transition:background .14s,border-color .14s,color .14s;text-decoration:none;white-space:nowrap}
+.mi-btn:hover{text-decoration:none}
+.mi-btn--primary{background:var(--mi-primary);color:var(--mi-primary-foreground)}
+.mi-btn--primary:hover{background:color-mix(in srgb,var(--mi-primary) 88%,#000)}
+.dark .mi-btn--primary:hover{background:color-mix(in srgb,var(--mi-primary) 88%,#fff)}
+.mi-btn--outline{background:transparent;color:var(--mi-foreground);border-color:var(--mi-border)}
+.mi-btn--outline:hover{background:var(--mi-secondary)}
+.mi-btn--ghost{background:transparent;color:var(--mi-muted-foreground)}
+.mi-btn--ghost:hover{background:var(--mi-secondary);color:var(--mi-foreground)}
+.mi-btn--sm{padding:6px 11px;font-size:.8rem}
+.mi-btn--icon{padding:8px;width:34px;height:34px}
+.mi-btn .mi-i{width:15px;height:15px}
+/* anchor buttons: beat the generic `.mi a` link colour (specificity) and never underline */
+.mi a.mi-btn{color:var(--mi-foreground);text-decoration:none}
+.mi a.mi-btn:hover{text-decoration:none}
+.mi a.mi-btn--primary{color:var(--mi-primary-foreground)}
+.mi a.mi-btn--ghost{color:var(--mi-muted-foreground)}
+
+/* ------------------------------------------------------------- KPI tiles - */
+.mi-kpi{background:var(--mi-card);border:1px solid var(--mi-border);border-radius:var(--mi-radius);padding:15px 16px;box-shadow:var(--mi-shadow)}
+.mi-kpi .v{font-size:1.7rem;font-weight:800;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;color:var(--mi-foreground)}
+.mi-kpi .l{font-size:.78rem;color:var(--mi-muted-foreground);margin-top:7px;font-weight:600}
+.mi-kpi .s{font-size:.72rem;color:var(--mi-muted-foreground);opacity:.85;margin-top:2px}
+.mi-kpi--accent{border-left:3px solid var(--mi-primary)}
+
+/* -------------------------------------------------------------- tables --- */
+.mi-table{width:100%;border-collapse:collapse;font-size:.875rem;
+  background:var(--mi-card);border:1px solid var(--mi-border);border-radius:var(--mi-radius);overflow:hidden}
+.mi-table th{background:var(--mi-secondary);color:var(--mi-muted-foreground);
+  font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:9px 13px;font-weight:700}
+.mi-table td{padding:9px 13px;border-top:1px solid var(--mi-border);vertical-align:top}
+.mi-table tr:hover td{background:color-mix(in srgb,var(--mi-secondary) 55%,transparent)}
+.mi-table code{font-family:var(--mi-mono);font-size:.82em;background:var(--mi-secondary);padding:1px 5px;border-radius:4px}
+.mi-num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* --------------------------------------------------------------- code ---- */
+.mi-code{background:var(--mi-code-bg);border:1px solid color-mix(in srgb,var(--mi-code-fg) 12%,var(--mi-code-bg));
+  border-radius:var(--mi-radius);overflow:hidden;margin:16px 0}
+.mi-code-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:7px 13px;background:rgba(255,255,255,.03);color:var(--mi-code-muted);
+  font-family:var(--mi-mono);font-size:.72rem;border-bottom:1px solid rgba(255,255,255,.06)}
+.mi-code pre{margin:0;padding:14px 16px;overflow-x:auto}
+.mi-code code{font-family:var(--mi-mono);font-size:.82rem;line-height:1.65;color:var(--mi-code-fg);white-space:pre}
+/* offline token classes (pre-highlight at build; no CDN) */
+.mi-code .tok-kw{color:var(--mi-code-kw)} .mi-code .tok-str{color:var(--mi-code-str)}
+.mi-code .tok-num{color:var(--mi-code-num)} .mi-code .tok-com{color:var(--mi-code-com);font-style:italic}
+.mi-code .tok-fn{color:var(--mi-code-fn)} .mi-code .tok-punc{color:var(--mi-code-muted)}
+.mi-copy{background:transparent;border:1px solid rgba(255,255,255,.16);color:var(--mi-code-muted);
+  padding:2px 8px;border-radius:5px;font-size:.7rem;cursor:pointer;font-family:inherit}
+.mi-copy:hover{background:rgba(255,255,255,.08);color:#fff}
+/* inline code */
+.mi code{font-family:var(--mi-mono);font-size:.85em;background:var(--mi-secondary);
+  color:var(--mi-foreground);padding:1px 6px;border-radius:5px}
+
+/* -------------------------------------------------- section divider ------ */
+.mi-divider{display:flex;align-items:center;gap:14px;color:var(--mi-muted-foreground);
+  font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:22px 0 12px}
+.mi-divider::before,.mi-divider::after{content:"";flex:1;height:1px;background:var(--mi-border)}
+
+/* --------------------------------------------------------------- nav ----- */
+.mi-nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.mi-nav::-webkit-scrollbar{display:none}
+.mi-nav a{font-size:.83rem;font-weight:600;color:var(--mi-muted-foreground);
+  padding:9px 11px;border-bottom:2px solid transparent;white-space:nowrap}
+.mi-nav a:hover{color:var(--mi-foreground);text-decoration:none}
+.mi-nav a[aria-current="true"],.mi-nav a.is-active{color:var(--mi-primary);border-bottom-color:var(--mi-primary)}
+.dark .mi-nav a[aria-current="true"],.dark .mi-nav a.is-active{color:var(--mi-foreground);border-bottom-color:var(--mi-foreground)}
+
+/* ------------------------------------------------------- AI / chat -------- */
+.mi-chat{background:var(--mi-card);border:1px solid var(--mi-border);border-radius:var(--mi-radius);overflow:hidden;box-shadow:var(--mi-shadow)}
+.mi-chat-hd{display:flex;align-items:center;gap:9px;padding:11px 14px;
+  background:var(--mi-primary);color:var(--mi-primary-foreground);font-weight:600;font-size:.9rem}
+.dark .mi-chat-hd{background:var(--mi-secondary);color:var(--mi-foreground)}
+.mi-chat-body{padding:15px;display:flex;flex-direction:column;gap:11px}
+.mi-bubble{max-width:78%;padding:9px 13px;font-size:.875rem;line-height:1.5}
+.mi-bubble--user{align-self:flex-end;background:var(--mi-primary);color:var(--mi-primary-foreground);border-radius:10px 2px 10px 10px}
+.dark .mi-bubble--user{background:#1e3a8a}
+.mi-bubble--ai{align-self:flex-start;background:var(--mi-secondary);color:var(--mi-foreground);border:1px solid var(--mi-border);border-radius:2px 10px 10px 10px}
+.mi-ai-avatar{width:24px;height:24px;flex:0 0 auto;border-radius:6px;background:linear-gradient(135deg,#1e40af,#0891b2);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:.7rem;font-weight:800}
+
+/* --------------------------------------------------------- callout -------- */
+.mi-callout{background:color-mix(in srgb,var(--mi-primary) 5%,var(--mi-card));
+  border:1px solid color-mix(in srgb,var(--mi-primary) 20%,var(--mi-border));
+  border-radius:var(--mi-radius);padding:13px 16px;margin:16px 0;font-size:.9rem}
+.mi-callout--warn{background:color-mix(in srgb,var(--mi-warning) 8%,var(--mi-card));
+  border-color:color-mix(in srgb,var(--mi-warning) 35%,var(--mi-border))}
+
+/* ------------------------------------------------------------- utility ---- */
+.mi-star{color:var(--mi-muted-foreground);cursor:pointer}
+.mi-star:hover,.mi-star[aria-pressed="true"]{color:var(--mi-warning)}
+.mi-hero{padding:34px 0 26px;border-bottom:1px solid var(--mi-border)}
+.mi-footer{margin-top:34px;padding:20px 0;border-top:1px solid var(--mi-border);color:var(--mi-muted-foreground);font-size:.8rem}
+
+/* --------------------------------------------------------------- print ---- */
+@media print{
+  .mi-topbar,.mi-nav,.mi-copy,.mi-btn--icon,[data-print="hide"]{display:none!important}
+  body.mi{background:#fff;color:#000;font-size:11pt}
+  .mi-card,.mi-kpi,.mi-table{box-shadow:none;border-color:#ccc;break-inside:avoid}
+  .mi-code{background:#f6f8fa;border-color:#ccc}
+  .mi-code code,.mi-code .mi-code-bar{color:#1a2433}
+  .mi-code .tok-kw{color:#0b3d91}.mi-code .tok-str{color:#0a7a3a}.mi-code .tok-com{color:#6a737d}
+  .mi-code pre{white-space:pre-wrap}
+  a{color:#000;text-decoration:underline}
+}
+
+/* ------------------------------------------------------------- brand logo -
+   Official SSM Health / Mission Intelligence logo, embedded as data-URIs so
+   the theme stays self-contained. Navy artwork; turned white in dark mode via
+   filter (matches the product). Source: current-image-asset-library. */
+:root{
+  --mi-logo-lockup:url("data:image/png;base64,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");
+  --mi-logo-mark:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEQAAAAeCAYAAACVBrgjAAADvklEQVR4nOVZu04bQRSdRf6DkMpAG6dIQRNLsS3xA+HZxCEldOAGCcs/EMuWaMAdNJGCNg2vfAESJpJpKA1SlEhroxQx37DR2XjM7Hhmd+7uGudxKrB2Zu6cOfcxdyzXddnfAqfbc5273uD/fDZjJb1Giv3Bm/903GQgwOn+ZJetG9Vn7szUpPfHdHqSfT6sWP8cIfXdU7fZausIGILT7TGQUlzOJ7J+inpizVabdbxTe5DuXOEF+/b9B9veXGTTU0/ZTHoSRlpUImq7JyTjQQTWLK4UEnMdKyyG1BWG/j6RAnuVzfh+/9K6Yfx0c9mMd2phxjZbN+5med9HcBD42tulRUvnXuKBcZfKZZ+z3MtnofZoCWlKhqoM0QEGXrbazD5uesbpxlFUoVof40GCfXRhNIfJPpSE1CVDcdpRA5Z9dOFyYs4+VjxXAmEL76rGqpDXp6qKQswQIfOrVVcMaHHIkBUDuWIzC6vVSEZjno3yvnHApc4/RMhG+cAV5YcB1+c7iQUsqGWjfGBsrLg2ZSwVZ4eVQU0zIS5oS764V1tPbFGQbbohqFIkgzI2CuB+PoVAirNzW0Mf3n/9kIg6ZOUFQXZR2YVHheJKgTVqa5anEPilyrD/hQwAMW5QmI1q0XnChsZJBoCMhYCfQuxQfdARLlFRQNkQAmhcMnjGmE4/8aploIM70NUtqU6xXr99r128UVsjl8XU1ChnE2oJb1IwmtY95dLSQ5ZRob536snI1Dh8i+BMOV0xk2E8hQyejcKqZxSDKAoROIMAdQUS4nR7XkrSuZXwHdKiccGlyv+Ugo2fJqVgBCm4CMZyGZ2PcnTu7pl9fBGphBbJ0KV9k7FUBBV41+c7pOs/o17PdUBsEjekSvujIAPgAVflflDRxHZpiT0miisFX6CmZJS4ZASB85BCM+exUC4t+bIBhQxZVVGBVKxSx+AuA5lgsVHj7LASmQyMTaorhlaEDNFLvCyDxZIq1VXBWJb6uNwEAVVeV55/kHYbtfXQPE0FrxPE1Do7tzUWMpDJUFeFze/rhzj93mTcbAJVoOAS0yplXnE8KlekdtP2pQqqGkdHtrKFaPfbflHuE3IXnFpw8Wu4+BvmqO+eDPqzb5bzRl191UF4LtxvZZK77jZ87upW+1DEizVAPr0odxpRVUGyx2UN3/NOOn/64AAJgEyEicpCnyFEY+RSWPUN1eUo3XxxHXTbvacH/aue77nENBYZE6ICJwCI8sgUJy7IdgjzWmN/ynQMeidc4pC2aQwwRZJz/QIYoOZBGjXfqwAAAABJRU5ErkJggg==");
+}
+.mi-logo{display:inline-block;height:38px;aspect-ratio:304/66;
+  background:var(--mi-logo-lockup) no-repeat left center/contain}
+.mi-logo--sm{height:30px}
+.mi-mark{display:inline-block;height:22px;width:auto;aspect-ratio:68/30;
+  background:var(--mi-logo-mark) no-repeat center/contain;vertical-align:middle}
+.mi-mark--lg{height:34px}
+.dark .mi-logo,.dark .mi-mark{filter:brightness(0) invert(1)}
+
+
+/* ---- Chart series (validated: dataviz validate_palette.js, light + dark) ---- */
+:root{ --s-a:#2563D9; --s-c:#14b8a6; }
+.dark{ --s-a:#3b82f6; --s-c:#0d9488; }
+@media (prefers-color-scheme: dark){ :root:not(.light){ --s-a:#3b82f6; --s-c:#0d9488; } }
+
+/* ---- Calculator layout ---- */
+.tco-wrap{ max-width:1180px; margin:0 auto; padding:0 20px 64px; }
+.tco-hero{ padding:28px 0 8px; }
+.tco-hero h1{ font-size:clamp(24px,3.2vw,34px); line-height:1.15; margin:6px 0 10px; letter-spacing:-.02em; }
+.tco-lede{ color:var(--mi-muted-foreground); max-width:76ch; font-size:15px; line-height:1.6; }
+
+.ctl-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(228px,1fr)); gap:18px 22px; }
+.ctl{ display:flex; flex-direction:column; gap:6px; }
+.ctl label{ font-size:12px; font-weight:600; letter-spacing:.01em; display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.ctl .val{ font-variant-numeric:tabular-nums; font-weight:700; color:var(--mi-primary); font-size:13px; }
+.dark .ctl .val{ color:#cbd5e1; }
+.ctl input[type=range]{ width:100%; accent-color:var(--s-a); height:22px; }
+.ctl select, .ctl input[type=number]{
+  width:100%; padding:7px 9px; border:1px solid var(--mi-border); border-radius:6px;
+  background:var(--mi-background); color:var(--mi-foreground); font:inherit; font-size:13px;
+}
+.ctl .hint{ font-size:11px; color:var(--mi-muted-foreground); line-height:1.4; }
+.ctl-check{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; }
+.ctl-check input{ width:16px; height:16px; accent-color:var(--s-a); }
+.grp-title{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.09em;
+  color:var(--mi-muted-foreground); margin:22px 0 12px; padding-bottom:7px; border-bottom:1px solid var(--mi-border); }
+.grp-title:first-of-type{ margin-top:4px; }
+
+/* KPI row */
+.kpi-row{ display:grid; grid-template-columns:repeat(auto-fit,minmax(178px,1fr)); gap:14px; margin:18px 0 6px; }
+.kpi-box{ border:1px solid var(--mi-border); border-radius:var(--mi-radius,8px); padding:14px 16px; background:var(--mi-card); }
+.kpi-box.hero-box{ border-color:var(--s-a); border-width:2px; }
+.kpi-k{ font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--mi-muted-foreground); font-weight:700; }
+.kpi-v{ font-size:clamp(21px,2.6vw,29px); font-weight:750; font-variant-numeric:tabular-nums; letter-spacing:-.02em; margin-top:5px; }
+.kpi-s{ font-size:11.5px; color:var(--mi-muted-foreground); margin-top:3px; }
+
+/* Chart */
+.chart-head{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
+.legend{ display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+.legend span{ display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; }
+.swatch{ width:12px; height:12px; border-radius:3px; flex:0 0 auto; }
+.chart-box{ position:relative; overflow-x:auto; }
+#chart{ display:block; width:100%; min-width:520px; height:300px; }
+.tip{ position:absolute; pointer-events:none; opacity:0; transition:opacity .1s; z-index:20;
+  background:var(--mi-card); border:1px solid var(--mi-border); border-radius:7px; padding:9px 11px;
+  font-size:12px; box-shadow:0 6px 22px rgba(2,8,23,.16); min-width:158px; }
+.tip b{ display:block; margin-bottom:5px; font-size:12.5px; }
+.tip .row{ display:flex; justify-content:space-between; gap:14px; font-variant-numeric:tabular-nums; }
+.tip .row i{ font-style:normal; color:var(--mi-muted-foreground); display:inline-flex; align-items:center; gap:6px; }
+.tip .tot{ border-top:1px solid var(--mi-border); margin-top:5px; padding-top:5px; font-weight:700; }
+
+table.tco{ width:100%; border-collapse:collapse; font-size:13.5px; }
+table.tco th, table.tco td{ padding:9px 11px; border-bottom:1px solid var(--mi-border); text-align:right; }
+table.tco th:first-child, table.tco td:first-child{ text-align:left; }
+table.tco thead th{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--mi-muted-foreground); }
+table.tco td{ font-variant-numeric:tabular-nums; }
+table.tco tr.best td{ background:color-mix(in srgb, var(--s-c) 10%, transparent); font-weight:650; }
+table.tco tr.best td:first-child::after{ content:" ← recommended"; font-weight:600; font-size:11px; color:var(--mi-muted-foreground); }
+.detail-t{ cursor:pointer; font-size:13px; font-weight:600; color:var(--mi-primary); padding:6px 0; }
+.dark .detail-t{ color:#cbd5e1; }
+.src{ font-size:12px; color:var(--mi-muted-foreground); line-height:1.75; }
+.src a{ color:inherit; }
+.pill{ display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  padding:2.5px 7px; border-radius:999px; border:1px solid var(--mi-border); color:var(--mi-muted-foreground); }
+.pill.est{ border-color:var(--mi-warning); color:var(--mi-warning); }
+.two-col{ display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:18px; }
+.mono{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; }
+.btn-row{ display:flex; gap:9px; flex-wrap:wrap; margin-top:14px; }
+button.mi-btn{ cursor:pointer; }
+@media print{ .no-print{ display:none } }
+</style>
+</head>
+<body class="mi">
+
+<header class="mi-topbar">
+  <div class="mi-logo" role="img" aria-label="SSM Health — Mission Intelligence"></div>
+  <div class="mi-topbar-spacer"></div>
+  <span class="pill">Draft · Non-PHI</span>
+</header>
+
+<div class="tco-wrap">
+
+  <section class="tco-hero">
+    <div class="mi-eyebrow">Agentic Software Engineering · Pilot Planning</div>
+    <h1>Total Cost of Ownership — Business, Individual Max &amp; Foundry</h1>
+    <p class="tco-lede">
+      An interactive comparison of three commercial paths: <strong>Option A</strong> (ChatGPT Business, flat team seats),
+      <strong>Option B</strong> (one maximum-usage individual ChatGPT Pro subscription per developer), and
+      <strong>Option C</strong> (Codex CLI pointed at GPT-5.6 in <strong>Microsoft Foundry</strong>, pay-per-token).
+      The phased pilot starts on A and moves only the heaviest users to C; B is modelled as a full-team alternative.
+      Move any slider to recalculate. Training + non-PHI work only.
+    </p>
+  </section>
+
+  <div class="mi-callout mi-callout--warn" style="margin:16px 0 22px">
+    <strong>SSM is not on ADI.</strong> Option C is therefore priced at <strong>full list price through Microsoft
+    Foundry</strong> (Azure), not a discounted Databricks/ADI rate. Foundry carries the GPT-5.6 family at OpenAI list
+    rates and exposes the <strong>Responses API</strong> — required for the Sol tier — on the <span class="mono">/openai/v1/</span>
+    path. Note the documented streaming caveat: older dated <span class="mono">api-version</span> values can buffer
+    Responses-API streams instead of delivering them incrementally, so pin the current API version when wiring Codex.
+  </div>
+
+  <!-- ================= CONTROLS ================= -->
+  <section class="mi-card mi-card--pad-lg no-print">
+    <div class="mi-card-hd">
+      <div>
+        <div class="mi-card-title">Model inputs</div>
+        <div class="mi-card-sub">Everything recalculates live. Token defaults use published 2026 telemetry and should be replaced with SSM pilot measurements.</div>
+      </div>
+    </div>
+
+    <div class="grp-title">Team &amp; phasing</div>
+    <div class="ctl-grid">
+      <div class="ctl">
+        <label for="devs">Developers in pilot <span class="val" id="devs_v">8</span></label>
+        <input type="range" id="devs" min="1" max="40" step="1" value="8">
+      </div>
+      <div class="ctl">
+        <label for="months">Pilot length (months) <span class="val" id="months_v">12</span></label>
+        <input type="range" id="months" min="3" max="24" step="1" value="12">
+      </div>
+      <div class="ctl">
+        <label for="phaseA">Months on Option A only <span class="val" id="phaseA_v">3</span></label>
+        <input type="range" id="phaseA" min="0" max="18" step="1" value="3">
+        <span class="hint">Training runway before anyone moves to Foundry.</span>
+      </div>
+      <div class="ctl">
+        <label for="grad">Devs who graduate to C <span class="val" id="grad_v">3</span></label>
+        <input type="range" id="grad" min="0" max="40" step="1" value="3">
+        <span class="hint">Power users who outgrow the flat limits.</span>
+      </div>
+      <div class="ctl">
+        <label>Graduated devs keep their seat</label>
+        <span class="ctl-check"><input type="checkbox" id="keepSeat" checked><span>Keep ChatGPT Business seat</span></span>
+        <span class="hint">Usually yes — they still use ChatGPT for chat/research.</span>
+      </div>
+    </div>
+
+    <div class="mi-callout mi-callout--info" style="margin:18px 0 8px">
+      <strong>Observed benchmark:</strong> Jellyfish measured 12,000 developers across 200 companies in Q1 2026.
+      The median AI-coding user consumed <strong>51M tokens/month</strong>, or <strong>2.4M per workday</strong> at 21 workdays/month;
+      the 90th percentile consumed <strong>380M/month</strong>, or <strong>18.1M/workday</strong>.
+      This is cross-tool telemetry from Claude Code and Cursor, not a Codex-only sample.
+    </div>
+
+    <div class="grp-title">Usage assumptions <span class="pill est">benchmark + estimate</span></div>
+    <div class="ctl-grid">
+      <div class="ctl">
+        <label for="tokA">Tokens/dev/day — typical user <span class="val" id="tokA_v">2.5M</span></label>
+        <input type="range" id="tokA" min="0.5" max="30" step="0.5" value="2.5">
+        <span class="hint">Rounded from the measured 51M/month median.</span>
+      </div>
+      <div class="ctl">
+        <label for="tokC">Tokens/dev/day — heavy user <span class="val" id="tokC_v">18M</span></label>
+        <input type="range" id="tokC" min="1" max="40" step="0.5" value="18">
+        <span class="hint">Rounded from the measured 380M/month 90th percentile.</span>
+      </div>
+      <div class="ctl">
+        <label for="wdays">Working days / month <span class="val" id="wdays_v">21</span></label>
+        <input type="range" id="wdays" min="15" max="23" step="1" value="21">
+      </div>
+      <div class="ctl">
+        <label for="outShare">Output share of tokens <span class="val" id="outShare_v">10%</span></label>
+        <input type="range" id="outShare" min="5" max="40" step="1" value="10">
+        <span class="hint">Agentic workflows are input-heavy; output is 6× the input price.</span>
+      </div>
+      <div class="ctl">
+        <label for="cacheRate">Input served from cache <span class="val" id="cacheRate_v">70%</span></label>
+        <input type="range" id="cacheRate" min="0" max="90" step="5" value="70">
+        <span class="hint">Cached input is ~10× cheaper than fresh.</span>
+      </div>
+    </div>
+
+    <div class="grp-title">Option A — ChatGPT Business</div>
+    <div class="ctl-grid">
+      <div class="ctl">
+        <label for="seat">Seat price</label>
+        <select id="seat">
+          <option value="20" selected>$20 / seat / mo — annual billing</option>
+          <option value="25">$25 / seat / mo — monthly billing</option>
+        </select>
+        <span class="hint">Codex bundled in the standard seat. 2-seat minimum.</span>
+      </div>
+      <div class="ctl">
+        <label for="incTok">Included tokens/dev/mo <span class="val" id="incTok_v">150M</span></label>
+        <input type="range" id="incTok" min="0" max="500" step="10" value="150">
+        <span class="hint"><span class="pill est">assumption</span> OpenAI publishes the flat cap in tasks/messages per week, <em>not</em> tokens. This converts it — the key number to calibrate in a trial.</span>
+      </div>
+      <div class="ctl">
+        <label>Overflow model policy</label>
+        <span class="hint"><strong>Sol is always the driver.</strong> Overflow uses the same Sol + bounded Terra delegation mix below.</span>
+      </div>
+    </div>
+
+    <div class="grp-title">Option B — Individual maximum Codex subscription</div>
+    <div class="ctl-grid">
+      <div class="ctl">
+        <label for="proSeat">Subscription price</label>
+        <select id="proSeat">
+          <option value="200" selected>$200 / developer / mo — Pro 20×</option>
+        </select>
+        <span class="hint">Official plan name: ChatGPT Pro $200; “Codex Max” is shorthand for its maximum Codex usage.</span>
+      </div>
+      <div class="ctl">
+        <label for="proIncTok">Included token-equivalent/dev/mo <span class="val" id="proIncTok_v">400M</span></label>
+        <input type="range" id="proIncTok" min="50" max="800" step="25" value="400">
+        <span class="hint"><span class="pill est">assumption</span> OpenAI publishes Pro as 20× Plus usage, not a fixed token allowance; calibrate from the usage dashboard.</span>
+      </div>
+    </div>
+
+    <div class="grp-title">Option C — Codex BYOM via Microsoft Foundry</div>
+    <div class="ctl-grid">
+      <div class="ctl">
+        <label for="terraShare">Bounded Terra delegation <span class="val" id="terraShare_v">20%</span></label>
+        <input type="range" id="terraShare" min="0" max="50" step="5" value="20">
+        <span class="hint" id="mixNote">Sol drives every session; 20% of token volume is bounded work delegated to Terra.</span>
+      </div>
+      <div class="ctl">
+        <label for="uplift">Foundry uplift over OpenAI list <span class="val" id="uplift_v">0%</span></label>
+        <input type="range" id="uplift" min="0" max="30" step="1" value="0">
+        <span class="hint">Foundry matches list today; raise to stress-test.</span>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="mi-btn mi-btn--outline mi-btn--sm" type="button" data-preset="light">Preset · Light adoption</button>
+      <button class="mi-btn mi-btn--outline mi-btn--sm" type="button" data-preset="base">Preset · Base case</button>
+      <button class="mi-btn mi-btn--outline mi-btn--sm" type="button" data-preset="heavy">Preset · Heavy adoption</button>
+      <button class="mi-btn mi-btn--ghost mi-btn--sm" type="button" id="reset">Reset defaults</button>
+    </div>
+  </section>
+
+  <!-- ================= RESULTS ================= -->
+  <h2 style="margin:30px 0 2px;font-size:19px;letter-spacing:-.01em">Combined pilot cost</h2>
+  <p class="tco-lede" style="margin-bottom:4px" id="scenarioLine"></p>
+
+  <div class="kpi-row">
+    <div class="kpi-box hero-box"><div class="kpi-k">Total pilot cost</div><div class="kpi-v" id="k_total">—</div><div class="kpi-s" id="k_total_s">phased A → C</div></div>
+    <div class="kpi-box"><div class="kpi-k">Option A subtotal</div><div class="kpi-v" id="k_a">—</div><div class="kpi-s" id="k_a_s">seats + overflow</div></div>
+    <div class="kpi-box"><div class="kpi-k">Option C subtotal</div><div class="kpi-v" id="k_c">—</div><div class="kpi-s" id="k_c_s">Foundry tokens</div></div>
+    <div class="kpi-box"><div class="kpi-k">Blended / dev / month</div><div class="kpi-v" id="k_perdev">—</div><div class="kpi-s">across whole pilot</div></div>
+    <div class="kpi-box"><div class="kpi-k">Exit run-rate</div><div class="kpi-v" id="k_run">—</div><div class="kpi-s">final month, per month</div></div>
+  </div>
+
+  <section class="mi-card mi-card--pad-lg" style="margin-top:18px">
+    <div class="chart-head">
+      <div>
+        <div class="mi-card-title">Monthly cost over the pilot</div>
+        <div class="mi-card-sub" id="chartSub">Stacked: flat seats vs. metered tokens</div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--s-a)"></i>Option A — seats + overflow</span>
+        <span><i class="swatch" style="background:var(--s-c)"></i>Option C — Foundry tokens</span>
+      </div>
+    </div>
+    <div class="chart-box">
+      <svg id="chart" role="img" aria-label="Monthly pilot cost, Option A and Option C stacked by month"></svg>
+      <div class="tip" id="tip"></div>
+    </div>
+    <details style="margin-top:10px">
+      <summary class="detail-t">Show data table</summary>
+      <div style="overflow-x:auto;margin-top:10px">
+        <table class="tco"><thead><tr><th>Month</th><th>Devs on A</th><th>Devs on C</th><th>Option A</th><th>Option C</th><th>Total</th></tr></thead>
+        <tbody id="monthBody"></tbody></table>
+      </div>
+    </details>
+  </section>
+
+  <section class="mi-card mi-card--pad-lg" style="margin-top:18px">
+    <div class="mi-card-hd"><div>
+      <div class="mi-card-title">Strategy comparison</div>
+      <div class="mi-card-sub">Same team and usage assumptions — team seats, individual maximum subscriptions, metered Foundry, or the phased path.</div>
+    </div></div>
+    <div style="overflow-x:auto">
+      <table class="tco">
+        <thead><tr><th>Strategy</th><th>Total pilot cost</th><th>Per dev / month</th><th>vs. phased</th></tr></thead>
+        <tbody id="scenBody"></tbody>
+      </table>
+    </div>
+    <p class="mi-card-sub" style="margin-top:12px" id="scenNote"></p>
+  </section>
+
+  <div class="two-col" style="margin-top:18px">
+    <section class="mi-card mi-card--pad-lg">
+      <div class="mi-card-title">Option A — unit economics</div>
+      <table class="tco" style="margin-top:10px"><tbody id="aBody"></tbody></table>
+      <p class="mi-card-sub" style="margin-top:10px">
+        Flat seat covers Codex up to the included allowance; beyond it the workspace optionally buys shared credits.
+        <strong>If usage fits the cap, marginal model cost is $0</strong> — that is the whole value of the flat rate for training.
+      </p>
+    </section>
+    <section class="mi-card mi-card--pad-lg">
+      <div class="mi-card-title">Option B — unit economics</div>
+      <table class="tco" style="margin-top:10px"><tbody id="bBody"></tbody></table>
+      <p class="mi-card-sub" style="margin-top:10px">
+        Each developer owns a maximum-usage ChatGPT Pro subscription. It is simple and high-capacity, but it replaces
+        centralized Business workspace administration, SSO, consolidated billing, and organization-level usage controls
+        with individually managed accounts.
+      </p>
+    </section>
+    <section class="mi-card mi-card--pad-lg">
+      <div class="mi-card-title">Option C — unit economics</div>
+      <table class="tco" style="margin-top:10px"><tbody id="cBody"></tbody></table>
+      <p class="mi-card-sub" style="margin-top:10px">
+        No seats, no minimums, no caps — cost scales linearly with tokens. Runs on the developer's real machine
+        (full local execution), with model traffic inside SSM's Azure/Foundry tenant.
+      </p>
+    </section>
+  </div>
+
+  <section class="mi-card mi-card--pad-lg" style="margin-top:18px">
+    <div class="mi-card-title">How to read the three options</div>
+    <div class="two-col" style="margin-top:10px">
+      <div>
+        <p class="mi-card-sub"><strong>Phase 1 — train on A.</strong> A flat $20/seat gets the whole team a real coding agent
+        with managed SSO, admin controls and a no-training-on-your-data guarantee. During the learning period usage is
+        low and erratic — exactly when per-token billing is worst value. Cost is predictable and tiny.</p>
+      </div>
+      <div>
+        <p class="mi-card-sub"><strong>Phase 2 — graduate the heavy users to C.</strong> When a developer starts hitting the flat
+        weekly cap, that is the signal they are productive enough to justify metered tokens. Foundry gives them
+        unlimited throughput, real-machine execution, and keeps traffic in SSM's Azure tenant — while everyone
+        else stays on the cheap flat seat.</p>
+      </div>
+      <div>
+        <p class="mi-card-sub"><strong>Alternative — give every developer B.</strong> At $200 per developer per month,
+        individual Pro 20× subscriptions provide maximum Codex usage with a predictable fixed subscription cost.
+        The trade-off is governance: individual plans do not substitute for Business workspace administration,
+        SSO, organization-wide retention controls, or centralized spend management.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="mi-card mi-card--pad-lg" style="margin-top:18px">
+    <div class="mi-card-title">Assumptions &amp; sources</div>
+    <ul class="src" style="margin:10px 0 0;padding-left:18px">
+      <li><strong>Measured usage benchmark:</strong> Jellyfish analyzed 12,000 developers across 200 companies in Q1 2026.
+        The median user consumed 51M AI-coding tokens/month and the 90th percentile consumed 380M/month. At 21 workdays,
+        those become 2.4M and 18.1M tokens/workday. The underlying tools were Claude Code and Cursor, so applying the
+        figures to Codex is a planning inference, not Codex telemetry. —
+        <a href="https://jellyfish.co/blog/is-tokenmaxxing-cost-effective-new-data-from-jellyfish-explains/">Jellyfish Research</a></li>
+      <li><strong>GPT-5.6 credit rates (per 1M):</strong> Sol 125 input / 12.5 cached / 750 output credits;
+        Terra 62.5 / 6.25 / 375. At $0.04/credit, these equal Sol $5 / $0.50 / $30 and Terra $2.50 / $0.25 / $15.
+        OpenAI says Codex averages approximately $100–$200 per developer per month, with large variance. —
+        <a href="https://help.openai.com/en/articles/20001106-codex-rate-card">OpenAI Codex rate card</a></li>
+      <li><strong>Option A seat:</strong> ChatGPT Business $20/seat/mo annual ($25 monthly), 2-seat minimum; Codex bundled in the standard seat; SAML SSO, admin/spend controls, SOC 2 Type 2 + ISO 27001/27017/27018/27701, no training on your data. —
+        <a href="https://openai.com/business/pricing/">OpenAI Business pricing</a>,
+        <a href="https://help.openai.com/en/articles/8792828">OpenAI: ChatGPT Business</a></li>
+      <li><strong>Option A limits:</strong> Standard ChatGPT Business seats include Codex usage limits; most customers now
+        use token-based credit rates, and additional credits can extend usage. —
+        <a href="https://openai.com/index/codex-flexible-pricing-for-teams/">OpenAI: Codex pricing for teams</a>,
+        <a href="https://help.openai.com/en/articles/20001106-codex-rate-card">OpenAI Codex rate card</a></li>
+      <li><strong>Option B subscription:</strong> ChatGPT Pro $200 is OpenAI's highest-usage individual tier at 20× Plus
+        usage and “maximum Codex tasks.” “Codex Max” is shorthand in this document, not the official subscription name.
+        Additional credits are available after included limits. —
+        <a href="https://help.openai.com/en/articles/9793128">OpenAI: ChatGPT Pro tiers</a>,
+        <a href="https://help.openai.com/en/articles/12642688">OpenAI: flexible credits for Plus/Pro</a></li>
+      <li><strong>Option C — Foundry:</strong> GPT-5.6 available in Microsoft Foundry at list; Responses API (required for Sol) exposed on <span class="mono">/openai/v1/</span>; older dated <span class="mono">api-version</span> values can buffer streaming. Some tiers need a quota request. —
+        <a href="https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/endpoints">MS Learn: endpoints</a>, <a href="https://learn.microsoft.com/en-us/answers/questions/5942726/gpt-5-6-on-azure-openai-buffers-full-completion-in">MS Q&amp;A: Responses streaming</a></li>
+      <li><strong>Option C — Codex BYOM:</strong> custom provider in <span class="mono">~/.codex/config.toml</span> with base URL, key, and <span class="mono">wire_api = "responses"</span> for Sol. —
+        <a href="https://developers.openai.com/codex/config-advanced">Codex advanced config</a></li>
+      <li><span class="pill est">assumption</span> <strong>Included tokens/dev/mo on Option A</strong> — OpenAI publishes
+        token-based credit rates but not a fixed token-equivalent allowance for the baseline Business seat. The slider
+        default (150M) is a placeholder; calibrate it in a short trial. This is the single biggest lever on Option A's cost.</li>
+      <li><span class="pill est">assumption</span> <strong>Option B included token-equivalent</strong> — OpenAI describes
+        Pro $200 as 20× Plus usage rather than publishing a fixed token allowance. The default 400M/month is deliberately
+        conservative relative to the measured 380M/month 90th percentile; replace it with usage-dashboard evidence.</li>
+      <li><strong>Model policy:</strong> Sol is always the driver. Terra appears only as bounded delegation, controlled by
+        one workload-share slider; Luna is not part of this operating model.</li>
+      <li>Public pricing drifts. Re-verify before contracting. Non-PHI scope only.</li>
+    </ul>
+  </section>
+
+  <p class="src" style="margin-top:22px">
+    Prepared for Evan Fischell · revised 2026-07-27 · Draft for iteration. Companion document:
+    <span class="mono">Projects/docs/proposals/agentic-swe-pilot-ssm.md</span>
+  </p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var RATES = {
+    sol:   { inp:5.00, cached:0.50, out:30 },
+    terra: { inp:2.50, cached:0.25, out:15 }
+  };
+  var DEFAULTS = { devs:8, months:12, phaseA:3, grad:3, keepSeat:true, tokA:2.5, tokC:18,
+                   wdays:21, outShare:10, cacheRate:70, seat:"20", incTok:150,
+                   proSeat:"200", proIncTok:400, terraShare:20, uplift:0 };
+  var PRESETS = {
+    light: { devs:6,  months:12, phaseA:4, grad:1, tokA:1,   tokC:8,  incTok:150, proIncTok:400, terraShare:10 },
+    base:  { devs:8,  months:12, phaseA:3, grad:3, tokA:2.5, tokC:18, incTok:150, proIncTok:400, terraShare:20 },
+    heavy: { devs:12, months:12, phaseA:2, grad:7, tokA:8,   tokC:25, incTok:150, proIncTok:400, terraShare:30 }
+  };
+  var $ = function(id){ return document.getElementById(id); };
+  var IDS = ["devs","months","phaseA","grad","tokA","tokC","wdays","outShare","cacheRate",
+             "seat","incTok","proSeat","proIncTok","terraShare","uplift"];
+
+  function usd(n){
+    if(!isFinite(n)) n = 0;
+    if(Math.abs(n) >= 1000) return "$" + Math.round(n).toLocaleString("en-US");
+    if(Math.abs(n) >= 100)  return "$" + n.toFixed(0);
+    return "$" + n.toFixed(2);
+  }
+  function usdShort(n){
+    if(!isFinite(n)) n = 0;
+    if(Math.abs(n) >= 1e6) return "$" + (n/1e6).toFixed(2).replace(/\.00$/,"") + "M";
+    if(Math.abs(n) >= 10000) return "$" + (n/1000).toFixed(1).replace(/\.0$/,"") + "k";
+    return usd(n);
+  }
+  function tokM(n){ return (n/1e6).toFixed(0) + "M"; }
+
+  function readState(){
+    var s = {};
+    IDS.forEach(function(id){
+      var el = $(id);
+      s[id] = (el.type === "range") ? parseFloat(el.value) : el.value;
+    });
+    s.seat = parseFloat(s.seat);
+    s.proSeat = parseFloat(s.proSeat);
+    s.keepSeat = $("keepSeat").checked;
+    s.grad = Math.min(s.grad, s.devs);
+    s.phaseA = Math.min(s.phaseA, s.months);
+    return s;
+  }
+
+  // Split a token volume into fresh-input / cached-input / output.
+  function split(total, s){
+    var out = total * (s.outShare/100);
+    var input = total - out;
+    var cached = input * (s.cacheRate/100);
+    return { fresh: input - cached, cached: cached, out: out };
+  }
+  function costOf(sp, rate){
+    return (sp.fresh*rate.inp + sp.cached*rate.cached + sp.out*rate.out) / 1e6;
+  }
+  function mixShares(s){
+    var terra = Math.max(0, Math.min(50, s.terraShare)) / 100;
+    return { sol:1-terra, terra:terra };
+  }
+  function blendedCost(sp, s){
+    var m = mixShares(s);
+    return m.sol*costOf(sp,RATES.sol) + m.terra*costOf(sp,RATES.terra);
+  }
+  // Blended per-token cost for Option C at a given daily token rate.
+  function cPerDev(tokPerDay, s){
+    var total = tokPerDay * 1e6 * s.wdays;
+    var sp = split(total, s);
+    var base = blendedCost(sp, s);
+    return base * (1 + s.uplift/100);
+  }
+  // Option A: flat seat + optional overflow credits beyond the included allowance.
+  function aPerDev(tokPerDay, s){
+    var total = tokPerDay * 1e6 * s.wdays;
+    var included = s.incTok * 1e6;
+    var over = Math.max(0, total - included);
+    var overflow = over > 0 ? blendedCost(split(over, s), s) : 0;
+    return { seat: s.seat, overflow: overflow, total: s.seat + overflow,
+             monthTokens: total, includedTokens: included, overTokens: over };
+  }
+  // Option B: individual maximum-usage Pro subscription + optional credits beyond the modelled allowance.
+  function bPerDev(tokPerDay, s){
+    var total = tokPerDay * 1e6 * s.wdays;
+    var included = s.proIncTok * 1e6;
+    var over = Math.max(0, total - included);
+    var overflow = over > 0 ? blendedCost(split(over, s), s) : 0;
+    return { seat:s.proSeat, overflow:overflow, total:s.proSeat + overflow,
+             monthTokens:total, includedTokens:included, overTokens:over };
+  }
+
+  function buildSeries(s){
+    var rows = [], aTot = 0, cTot = 0;
+    var aUnit = aPerDev(s.tokA, s);
+    var cUnit = cPerDev(s.tokC, s);
+    for(var m = 1; m <= s.months; m++){
+      var onC = (m > s.phaseA) ? s.grad : 0;
+      var aOnly = s.devs - onC;
+      var aCost = aOnly * aUnit.total + (s.keepSeat ? onC * s.seat : 0);
+      var cCost = onC * cUnit;
+      rows.push({ m:m, aDevs:aOnly, cDevs:onC, a:aCost, c:cCost, t:aCost + cCost });
+      aTot += aCost; cTot += cCost;
+    }
+    return { rows:rows, aTot:aTot, cTot:cTot, total:aTot + cTot, aUnit:aUnit, cUnit:cUnit };
+  }
+
+  /* ---------------- chart ---------------- */
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function el(n, attrs){
+    var e = document.createElementNS(SVG_NS, n);
+    for(var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  // Rounded top corners only, anchored to the baseline (dataviz mark spec).
+  function topRoundPath(x, y, w, h, r){
+    r = Math.max(0, Math.min(r, h, w/2));
+    return "M"+x+","+(y+h)+" L"+x+","+(y+r)+" Q"+x+","+y+" "+(x+r)+","+y+
+           " L"+(x+w-r)+","+y+" Q"+(x+w)+","+y+" "+(x+w)+","+(y+r)+" L"+(x+w)+","+(y+h)+" Z";
+  }
+  function css(v){ return getComputedStyle(document.body).getPropertyValue(v).trim(); }
+
+  function drawChart(data){
+    var svg = $("chart"), tip = $("tip");
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    var rows = data.rows;
+    // Width comes from the svg's own layout rect (CSS width:100% governs, so this
+    // is the true rendered width). Re-stamp the viewBox on every draw: if it goes
+    // stale after a viewport change the coordinate system no longer matches the
+    // element and the chart renders scaled/clipped.
+    var rect = svg.getBoundingClientRect ? svg.getBoundingClientRect().width : 0;
+    var W = Math.max(Math.round(rect) || svg.clientWidth || 780, 520), H = 300;
+    var padL = 62, padR = 14, padT = 16, padB = 34;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("preserveAspectRatio", "xMinYMin meet");
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var maxV = Math.max.apply(null, rows.map(function(r){ return r.t; })) || 1;
+    // headroom + nice ceiling
+    var mag = Math.pow(10, Math.floor(Math.log10(maxV)));
+    var ceil = Math.ceil(maxV * 1.12 / (mag/2)) * (mag/2);
+    if(!isFinite(ceil) || ceil <= 0) ceil = 1;
+    var y = function(v){ return padT + plotH - (v/ceil)*plotH; };
+    var band = plotW / rows.length;
+    var bw = Math.max(6, Math.min(band * 0.62, 46));
+    var cA = css("--s-a") || "#2563D9", cC = css("--s-c") || "#14b8a6";
+    var ink = css("--mi-muted-foreground") || "#64748b";
+    var line = css("--mi-border") || "#e2e8f0";
+    var surface = css("--mi-card") || "#ffffff";
+
+    // gridlines + y labels (recessive)
+    for(var i = 0; i <= 4; i++){
+      var gv = ceil * i / 4, gy = y(gv);
+      svg.appendChild(el("line", { x1:padL, x2:W-padR, y1:gy, y2:gy, stroke:line, "stroke-width":1 }));
+      var t = el("text", { x:padL-9, y:gy+4, "text-anchor":"end", "font-size":11, fill:ink });
+      t.textContent = usdShort(gv);
+      svg.appendChild(t);
+    }
+
+    rows.forEach(function(r, i){
+      var cx = padL + band*i + (band - bw)/2;
+      var hA = (r.a/ceil)*plotH, hC = (r.c/ceil)*plotH;
+      var GAP = 2; // 2px surface gap between stacked segments
+      // Option C sits on top when present
+      var yA = y(r.a);
+      if(r.c > 0){
+        var yC = y(r.t);
+        var hCd = Math.max(1, hC - GAP);
+        svg.appendChild(el("path", { d: topRoundPath(cx, yC, bw, hCd, 4), fill:cC }));
+        svg.appendChild(el("rect", { x:cx, y:yA, width:bw, height:Math.max(1,hA), fill:cA }));
+      } else {
+        svg.appendChild(el("path", { d: topRoundPath(cx, yA, bw, Math.max(1,hA), 4), fill:cA }));
+      }
+      // x label: first, last, and every 3rd (selective labelling)
+      if(i === 0 || i === rows.length-1 || (i+1) % 3 === 0){
+        var xt = el("text", { x:cx+bw/2, y:H-padB+16, "text-anchor":"middle", "font-size":11, fill:ink });
+        xt.textContent = "M" + r.m;
+        svg.appendChild(xt);
+      }
+      // invisible full-height hit target
+      var hit = el("rect", { x:padL+band*i, y:padT, width:band, height:plotH, fill:"transparent" });
+      hit.style.cursor = "crosshair";
+      hit.addEventListener("mousemove", function(ev){
+        var box = svg.parentNode.getBoundingClientRect();
+        tip.style.opacity = 1;
+        tip.innerHTML =
+          "<b>Month " + r.m + "</b>" +
+          "<div class='row'><i><span class='swatch' style='background:"+cA+"'></span>Option A</i><span>" + usd(r.a) + "</span></div>" +
+          "<div class='row'><i><span class='swatch' style='background:"+cC+"'></span>Option C</i><span>" + usd(r.c) + "</span></div>" +
+          "<div class='row tot'><i>Total</i><span>" + usd(r.t) + "</span></div>" +
+          "<div class='row'><i>" + r.aDevs + " on A · " + r.cDevs + " on C</i><span></span></div>";
+        var tw = tip.offsetWidth || 170;
+        var px = ev.clientX - box.left + 14;
+        if(px + tw > box.width) px = ev.clientX - box.left - tw - 14;
+        tip.style.left = Math.max(0, px) + "px";
+        tip.style.top  = Math.max(0, ev.clientY - box.top - 10) + "px";
+      });
+      hit.addEventListener("mouseleave", function(){ tip.style.opacity = 0; });
+      svg.appendChild(hit);
+    });
+
+    // baseline
+    svg.appendChild(el("line", { x1:padL, x2:W-padR, y1:y(0), y2:y(0), stroke:ink, "stroke-width":1, opacity:.5 }));
+    void surface;
+  }
+
+  /* ---------------- render ---------------- */
+  function render(){
+    var s = readState();
+    // slider read-outs
+    $("devs_v").textContent = s.devs;
+    $("months_v").textContent = s.months;
+    $("phaseA_v").textContent = s.phaseA;
+    $("grad_v").textContent = s.grad;
+    $("tokA_v").textContent = s.tokA + "M";
+    $("tokC_v").textContent = s.tokC + "M";
+    $("wdays_v").textContent = s.wdays;
+    $("outShare_v").textContent = s.outShare + "%";
+    $("cacheRate_v").textContent = s.cacheRate + "%";
+    $("incTok_v").textContent = s.incTok + "M";
+    $("proIncTok_v").textContent = s.proIncTok + "M";
+    $("terraShare_v").textContent = s.terraShare + "%";
+    $("uplift_v").textContent = s.uplift + "%";
+    var m = mixShares(s);
+    $("mixNote").textContent = "Sol drives every session; " + Math.round(m.terra*100) +
+      "% of token volume is bounded work delegated to Terra.";
+    if($("grad").max != s.devs) $("grad").max = s.devs;
+    if($("phaseA").max != s.months) $("phaseA").max = s.months;
+
+    var d = buildSeries(s);
+    var devMonths = s.devs * s.months;
+
+    $("k_total").textContent  = usdShort(d.total);
+    $("k_total_s").textContent = s.months + " months · " + s.devs + " devs";
+    $("k_a").textContent = usdShort(d.aTot);
+    $("k_a_s").textContent = Math.round(d.total ? d.aTot/d.total*100 : 0) + "% of total";
+    $("k_c").textContent = usdShort(d.cTot);
+    $("k_c_s").textContent = Math.round(d.total ? d.cTot/d.total*100 : 0) + "% of total";
+    $("k_perdev").textContent = usd(devMonths ? d.total/devMonths : 0);
+    var last = d.rows[d.rows.length-1];
+    $("k_run").textContent = usd(last ? last.t : 0);
+
+    $("scenarioLine").textContent =
+      s.devs + " developers over " + s.months + " months — all on Option A for the first " + s.phaseA +
+      " month" + (s.phaseA === 1 ? "" : "s") + ", then " + s.grad + " power user" + (s.grad === 1 ? "" : "s") +
+      " move to Option C on Foundry" + (s.keepSeat ? " while keeping their ChatGPT seat" : "") + ".";
+    $("chartSub").textContent = "Stacked by month · flat seats vs. metered Foundry tokens";
+
+    // month table
+    $("monthBody").innerHTML = d.rows.map(function(r){
+      return "<tr><td>M" + r.m + "</td><td>" + r.aDevs + "</td><td>" + r.cDevs + "</td><td>" +
+        usd(r.a) + "</td><td>" + usd(r.c) + "</td><td><strong>" + usd(r.t) + "</strong></td></tr>";
+    }).join("");
+
+    // scenarios
+    var allA = d.aUnit.total * s.devs * s.months;
+    var bTypical = bPerDev(s.tokA, s);
+    var allB = bTypical.total * s.devs * s.months;
+    var allC = (s.grad * cPerDev(s.tokC, s) + (s.devs - s.grad) * cPerDev(s.tokA, s)) * s.months;
+    var scen = [
+      { n:"Option A only — everyone stays on flat seats", v:allA,
+        note:"Cheapest if nobody outgrows the cap; power users get throttled by the weekly limit." },
+      { n:"Option B only — individual Pro 20× for every developer", v:allB,
+        note:"Predictable maximum individual capacity, without Business workspace governance or centralized billing." },
+      { n:"Option C only — skip A, all pay-per-token", v:allC,
+        note:"No caps at all, but you pay metered tokens during the low-value learning period." },
+      { n:"Phased A → C (modelled above)", v:d.total, best:true,
+        note:"Train cheap on flat seats; meter only the users who have outgrown them." }
+    ];
+    $("scenBody").innerHTML = scen.map(function(x){
+      var delta = x.v - d.total;
+      var dTxt = Math.abs(delta) < 0.5 ? "—" : (delta > 0 ? "+" : "−") + usdShort(Math.abs(delta));
+      return "<tr class='" + (x.best ? "best" : "") + "'><td>" + x.n + "</td><td>" + usdShort(x.v) +
+        "</td><td>" + usd(devMonths ? x.v/devMonths : 0) + "</td><td>" + dTxt + "</td></tr>";
+    }).join("");
+    var cheapest = scen.reduce(function(a,b){ return b.v < a.v ? b : a; });
+    $("scenNote").textContent = "Lowest modelled total: " + cheapest.n.split(" — ")[0] + " (" + usdShort(cheapest.v) +
+      "). " + (cheapest.best ? "Phasing wins at these settings."
+      : "At these settings a single-option strategy is cheaper — but check the trade-off: " + cheapest.note);
+
+    // unit economics — Option A
+    var a = d.aUnit;
+    $("aBody").innerHTML = [
+      ["Seat (flat)", usd(a.seat) + " / dev / mo"],
+      ["Tokens used", tokM(a.monthTokens) + " / dev / mo"],
+      ["Included allowance", tokM(a.includedTokens) + " (assumption)"],
+      ["Overflow tokens", a.overTokens > 0 ? tokM(a.overTokens) : "none — fits the cap"],
+      ["Overflow credits", usd(a.overflow) + " / dev / mo"],
+      ["<strong>Total</strong>", "<strong>" + usd(a.total) + " / dev / mo</strong>"]
+    ].map(function(r){ return "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td></tr>"; }).join("");
+
+    // unit economics — Option B
+    var b = bPerDev(s.tokA, s);
+    $("bBody").innerHTML = [
+      ["Subscription", usd(b.seat) + " / dev / mo"],
+      ["Tokens modelled", tokM(b.monthTokens) + " / dev / mo"],
+      ["Included equivalent", tokM(b.includedTokens) + " (assumption)"],
+      ["Excess tokens", b.overTokens > 0 ? tokM(b.overTokens) : "none — fits modelled allowance"],
+      ["Additional credits", usd(b.overflow) + " / dev / mo"],
+      ["<strong>Total</strong>", "<strong>" + usd(b.total) + " / dev / mo</strong>"]
+    ].map(function(r){ return "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td></tr>"; }).join("");
+
+    // unit economics — Option C
+    var cTot1 = cPerDev(s.tokC, s);
+    var totalTokC = s.tokC * 1e6 * s.wdays;
+    var spC = split(totalTokC, s);
+    $("cBody").innerHTML = [
+      ["Seat cost", "$0 — no seats, no minimum"],
+      ["Tokens used", tokM(totalTokC) + " / dev / mo"],
+      ["Fresh input", tokM(spC.fresh)],
+      ["Cached input", tokM(spC.cached)],
+      ["Output", tokM(spC.out) + " (cost driver)"],
+      ["Blended rate", usd(cTot1 / (totalTokC/1e6)) + " per 1M tokens"],
+      ["<strong>Total</strong>", "<strong>" + usd(cTot1) + " / dev / mo</strong>"]
+    ].map(function(r){ return "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td></tr>"; }).join("");
+
+    drawChart(d);
+  }
+
+  // Draw FIRST, wire interactivity after. If any listener registration fails on
+  // an unusual browser, the numbers are already on the page rather than blank.
+  try { render(); } catch(e){ if(window.console) console.error("initial render failed", e); }
+
+  function on(el, ev, fn){ if(el && el.addEventListener) el.addEventListener(ev, fn); }
+  var safeRender = function(){ try { render(); } catch(e){ if(window.console) console.error(e); } };
+
+  try {
+    IDS.forEach(function(id){ on($(id), "input", safeRender); on($(id), "change", safeRender); });
+    on($("keepSeat"), "change", safeRender);
+
+    var presetBtns = document.querySelectorAll("[data-preset]");
+    Array.prototype.forEach.call(presetBtns, function(b){
+      on(b, "click", function(){
+        var p = PRESETS[b.getAttribute("data-preset")];
+        for(var k in p){ if($(k)) $(k).value = p[k]; }
+        safeRender();
+      });
+    });
+
+    on($("reset"), "click", function(){
+      for(var k in DEFAULTS){
+        var e = $(k); if(!e) continue;
+        if(e.type === "checkbox") e.checked = DEFAULTS[k]; else e.value = DEFAULTS[k];
+      }
+      safeRender();
+    });
+
+    // Re-draw on real size changes (viewport rotate, pane resize). ResizeObserver
+    // catches container changes that a window resize event alone can miss.
+    on(window, "resize", safeRender);
+    on(window, "orientationchange", safeRender);
+    if(window.ResizeObserver){
+      var chartBox = document.querySelector(".chart-box");
+      if(chartBox) new ResizeObserver(safeRender).observe(chartBox);
+    }
+    if(window.matchMedia){
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      if(mq.addEventListener) mq.addEventListener("change", safeRender);
+      else if(mq.addListener) mq.addListener(safeRender);
+    }
+  } catch(e){ if(window.console) console.error("wiring failed", e); }
+})();
+</script>
+</body>
+</html>

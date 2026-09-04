@@ -1,0 +1,147 @@
+# Deploy production on merge to main.
+#
+# GitHub-hosted runners only — no self-hosted runner, and no service-account
+# key. Authentication is Workload Identity Federation: GitHub mints a short-
+# lived OIDC token, Google exchanges it for credentials on gh-deploy-efc-site.
+# The provider's attribute condition pins that exchange to THIS repository and
+# to refs/heads/main, so a workflow on any other branch cannot obtain
+# production credentials even if it asks for them.
+#
+# The org blocks service-account key creation, so WIF is also the only
+# available path — there is no key to leak or rotate.
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys race; queue instead of cancelling, because a cancelled
+# deploy can leave traffic pointing at a half-built revision.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write        # required to mint the OIDC token for WIF
+
+env:
+  PROJECT: efc-prod
+  REGION: us-central1
+  SERVICE: efc-site
+  WIF_PROVIDER: projects/1037040972707/locations/global/workloadIdentityPools/github/providers/github
+  DEPLOY_SA: gh-deploy-efc-site@efc-prod.iam.gserviceaccount.com
+
+jobs:
+  # Re-run the suite against the exact merge commit. CI already runs on the PR,
+  # but a merge can produce a tree neither parent had.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: site/requirements.txt
+      - run: python -m pip install -r site/requirements.txt pytest
+      - run: python -m pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://evanfischellconsulting.com
+    outputs:
+      revision: ${{ steps.deploy.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # --source builds with Buildpacks via Cloud Build. Flags not given here
+      # are preserved from the live service, which is what keeps the Gemini key,
+      # the feedback bucket, max-instances and cpu-throttling settings intact.
+      - id: deploy
+        name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --source site \
+            --project "$PROJECT" \
+            --region "$REGION" \
+            --quiet
+          rev=$(gcloud run services describe "$SERVICE" \
+                  --project "$PROJECT" --region "$REGION" \
+                  --format='value(status.latestReadyRevisionName)')
+          echo "revision=$rev" >> "$GITHUB_OUTPUT"
+          echo "Deployed revision $rev"
+
+      # Traffic has silently stuck on a tagged revision here before, so assert
+      # the new revision is the one actually serving rather than trusting the
+      # deploy's own "serving 100 percent" line.
+      - name: Assert traffic follows the new revision
+        run: |
+          serving=$(gcloud run services describe "$SERVICE" \
+                      --project "$PROJECT" --region "$REGION" \
+                      --format='value(status.traffic[0].revisionName)')
+          latest="${{ steps.deploy.outputs.revision }}"
+          echo "serving=$serving latest=$latest"
+          if [ "$serving" != "$latest" ]; then
+            echo "::error::Traffic is on $serving, not the new revision $latest"
+            gcloud run services update-traffic "$SERVICE" \
+              --project "$PROJECT" --region "$REGION" --to-latest --quiet
+            exit 1
+          fi
+
+      # A green deploy is not proof the site works. Check the real hostname.
+      - name: Smoke-test the live site
+        run: |
+          fail=0
+          check() {
+            path="$1"; expect="$2"
+            code=$(curl -sS -o /tmp/body -w '%{http_code}' "https://evanfischellconsulting.com$path")
+            robots=$(curl -sSI "https://evanfischellconsulting.com$path" \
+                     | tr -d '\r' | awk -F': ' 'tolower($1)=="x-robots-tag"{print $2}')
+            if [ "$code" != "$expect" ]; then
+              echo "::error::$path returned $code, expected $expect"; fail=1; return
+            fi
+            if [ "$robots" != "noindex, nofollow, noarchive" ]; then
+              echo "::error::$path is missing the noindex header (got '$robots')"; fail=1; return
+            fi
+            echo "ok  $path  $code  [$robots]"
+          }
+          check /                          200
+          check /vendor-ai-review          200
+          check /vendor-ai-questionnaire   200
+          check /api/health                200
+          check /definitely-not-a-page     404
+
+          # the unlisted pages must stay unlinked from the landing page
+          curl -sS https://evanfischellconsulting.com/ > /tmp/index
+          for p in vendor-ai-review vendor-ai-questionnaire deck resume; do
+            if grep -q "$p" /tmp/index; then
+              echo "::error::landing page now links to /$p, which is meant to be unlisted"; fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Production deploy"
+            echo ""
+            echo "| | |"
+            echo "| :--- | :--- |"
+            echo "| Commit | \`${GITHUB_SHA:0:7}\` |"
+            echo "| Revision | \`${{ steps.deploy.outputs.revision }}\` |"
+            echo "| Site | https://evanfischellconsulting.com |"
+          } >> "$GITHUB_STEP_SUMMARY"
