@@ -297,6 +297,29 @@ def deck():
     return send_from_directory(app.root_path, "deck.html")
 
 
+# Stable, unlisted share links. Content stays with the engagement service so
+# document updates and generated downloads never drift from their source.
+EVERGREEN_ORIGIN = "https://evergreen-modernization-f7dftrmvkq-uc.a.run.app"
+EVERGREEN_LINKS = {
+    "": "/scope",
+    "/scope": "/scope",
+    "/sow": "/",
+    "/scope.docx": "/downloads/evergreen-scope.docx",
+    "/scope.pdf": "/downloads/evergreen-scope.pdf",
+    "/sow.docx": "/downloads/evergreen-sow.docx",
+    "/sow.pdf": "/downloads/evergreen-sow.pdf",
+}
+
+
+def evergreen_link():
+    return redirect(EVERGREEN_ORIGIN + EVERGREEN_LINKS[request.path[len("/evergreen"):]], code=302)
+
+
+for _suffix in EVERGREEN_LINKS:
+    app.add_url_rule("/evergreen" + _suffix, endpoint="evergreen" + _suffix,
+                     view_func=evergreen_link, methods=["GET"])
+
+
 @app.get("/resume")
 def resume():
     # Unlisted, like /deck: nothing links here; the page carries noindex.
