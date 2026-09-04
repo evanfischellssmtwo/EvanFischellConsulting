@@ -87,11 +87,17 @@ jobs:
       # Traffic has silently stuck on a tagged revision here before, so assert
       # the new revision is the one actually serving rather than trusting the
       # deploy's own "serving 100 percent" line.
+      # NB: status.traffic is not ordered by share. This service carries a
+      # leftover tag-only entry (noindex-f20912a) that sits FIRST in the list
+      # with no percent at all, so traffic[0] is not what is serving — select
+      # the entries with an actual share instead.
       - name: Assert traffic follows the new revision
         run: |
           serving=$(gcloud run services describe "$SERVICE" \
-                      --project "$PROJECT" --region "$REGION" \
-                      --format='value(status.traffic[0].revisionName)')
+                      --project "$PROJECT" --region "$REGION" --format=json \
+                    | jq -r '[.status.traffic[]
+                              | select((.percent // 0) > 0)
+                              | .revisionName] | unique | join(",")')
           latest="${{ steps.deploy.outputs.revision }}"
           echo "serving=$serving latest=$latest"
           if [ "$serving" != "$latest" ]; then
