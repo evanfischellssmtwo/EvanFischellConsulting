@@ -130,10 +130,12 @@ jobs:
           check /api/health                200
           check /definitely-not-a-page     404
 
-          # the unlisted pages must stay unlinked from the landing page
+          # The unlisted pages must stay unlinked from the landing page. Match a
+          # real link target, not the bare word — the copy legitimately contains
+          # "not a slide deck", which a substring grep reads as a link to /deck.
           curl -sS https://evanfischellconsulting.com/ > /tmp/index
-          for p in vendor-ai-review vendor-ai-questionnaire deck resume; do
-            if grep -q "$p" /tmp/index; then
+          for p in vendor-ai-review vendor-ai-questionnaire deck resume pilot-tco; do
+            if grep -qE "(href|src|action)=[\"']/?${p}([\"'/?#]|\$)" /tmp/index; then
               echo "::error::landing page now links to /$p, which is meant to be unlisted"; fail=1
             fi
           done
