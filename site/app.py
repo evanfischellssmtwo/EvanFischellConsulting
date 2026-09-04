@@ -10,8 +10,10 @@ import threading
 import time
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.request import urlopen
+from urllib.error import URLError
 
-from flask import Flask, jsonify, redirect, request, send_from_directory
+from flask import Flask, Response, abort, jsonify, redirect, request, send_from_directory
 
 app = Flask(__name__)
 
@@ -297,8 +299,7 @@ def deck():
     return send_from_directory(app.root_path, "deck.html")
 
 
-# Stable, unlisted share links. Content stays with the engagement service so
-# document updates and generated downloads never drift from their source.
+# Serve the engagement through this domain while retaining its canonical source.
 EVERGREEN_ORIGIN = "https://evergreen-modernization-f7dftrmvkq-uc.a.run.app"
 EVERGREEN_LINKS = {
     "": "/scope",
@@ -308,11 +309,36 @@ EVERGREEN_LINKS = {
     "/scope.pdf": "/downloads/evergreen-scope.pdf",
     "/sow.docx": "/downloads/evergreen-sow.docx",
     "/sow.pdf": "/downloads/evergreen-sow.pdf",
+    "/brand/efc.css": "/brand/efc.css",
+    "/brand/logos/efc-favicon.svg": "/brand/logos/efc-favicon.svg",
+    "/brand/logos/efc-wordmark-dark.svg": "/brand/logos/efc-wordmark-dark.svg",
 }
 
 
 def evergreen_link():
-    return redirect(EVERGREEN_ORIGIN + EVERGREEN_LINKS[request.path[len("/evergreen"):]], code=302)
+    target = EVERGREEN_LINKS[request.path[len("/evergreen"):]]
+    try:
+        with urlopen(EVERGREEN_ORIGIN + target, timeout=30) as upstream:
+            body = upstream.read()
+            content_type = upstream.headers.get("Content-Type", "application/octet-stream")
+            disposition = upstream.headers.get("Content-Disposition")
+    except (URLError, TimeoutError):
+        app.logger.warning("Evergreen document source unavailable")
+        abort(502)
+    if content_type.startswith("text/html"):
+        document = body.decode("utf-8")
+        for suffix, origin_path in EVERGREEN_LINKS.items():
+            if not suffix or origin_path == "/":
+                continue
+            for attribute in ("href", "src"):
+                document = document.replace(f'{attribute}="{origin_path}"',
+                                            f'{attribute}="/evergreen{suffix}"')
+        body = document.encode("utf-8")
+    response = Response(body, content_type=content_type)
+    response.headers["Cache-Control"] = "no-store"
+    if disposition:
+        response.headers["Content-Disposition"] = disposition
+    return response
 
 
 for _suffix in EVERGREEN_LINKS:
