@@ -10,8 +10,8 @@ import threading
 import time
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.request import urlopen
-from urllib.error import URLError
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 from flask import Flask, Response, abort, jsonify, redirect, request, send_from_directory
 
@@ -299,51 +299,144 @@ def deck():
     return send_from_directory(app.root_path, "deck.html")
 
 
-# Serve the engagement through this domain while retaining its canonical source.
+# Serve client engagements through this domain while retaining their canonical sources.
 EVERGREEN_ORIGIN = "https://evergreen-modernization-f7dftrmvkq-uc.a.run.app"
-EVERGREEN_LINKS = {
+EVERGREEN_EXPLICIT_LINKS = {
     "": "/scope",
+    "/": "/scope",
     "/scope": "/scope",
     "/sow": "/",
     "/scope.docx": "/downloads/evergreen-scope.docx",
     "/scope.pdf": "/downloads/evergreen-scope.pdf",
     "/sow.docx": "/downloads/evergreen-sow.docx",
     "/sow.pdf": "/downloads/evergreen-sow.pdf",
-    "/brand/efc.css": "/brand/efc.css",
-    "/brand/logos/efc-favicon.svg": "/brand/logos/efc-favicon.svg",
-    "/brand/logos/efc-wordmark-dark.svg": "/brand/logos/efc-wordmark-dark.svg",
+}
+
+EVERGREEN_DOWNLOAD_SHORTCUTS = {
+    "/downloads/evergreen-scope.pdf": "/scope.pdf",
+    "/downloads/evergreen-scope.docx": "/scope.docx",
+    "/downloads/evergreen-sow.pdf": "/sow.pdf",
+    "/downloads/evergreen-sow.docx": "/sow.docx",
+}
+
+UTMB_ORIGIN = "https://utmb-imaging-eval-f7dftrmvkq-uc.a.run.app"
+UTMB_EXPLICIT_LINKS = {
+    "": "/",
+    "/": "/",
+    "/vendor-ai-review": "/vendor-ai-review",
+    "/panel-biographies": "/panel-biographies",
+    "/docs/panel-biographies": "/panel-biographies",
+    "/health": "/health",
 }
 
 
-def evergreen_link():
-    target = EVERGREEN_LINKS[request.path[len("/evergreen"):]]
+def _rewrite_evergreen_html(html_text: str) -> str:
+    def _repl(match):
+        attr = match.group(1)
+        quote = match.group(2)
+        path = match.group(3)
+
+        if path.startswith("/evergreen"):
+            return match.group(0)
+
+        if path in EVERGREEN_DOWNLOAD_SHORTCUTS:
+            new_path = f"/evergreen{EVERGREEN_DOWNLOAD_SHORTCUTS[path]}"
+        elif path == "/":
+            new_path = "/evergreen/sow"
+        elif path == "/scope":
+            new_path = "/evergreen/scope"
+        elif path.startswith(("/guide", "/brand", "/downloads")) or path == "/index.md":
+            new_path = f"/evergreen{path}"
+        else:
+            new_path = path
+        return f'{attr}={quote}{new_path}{quote}'
+
+    pattern = re.compile(r'\b(href|src)=(["\'])(/[^"\']*)\2', re.IGNORECASE)
+    return pattern.sub(_repl, html_text)
+
+
+def _rewrite_utmb_html(html_text: str) -> str:
+    def _repl(match):
+        attr = match.group(1)
+        quote = match.group(2)
+        path = match.group(3)
+
+        if path.startswith("/utmb"):
+            return match.group(0)
+
+        if path == "/":
+            new_path = "/utmb"
+        elif path in ("/vendor-ai-review", "/panel-biographies", "/docs/panel-biographies"):
+            new_path = f"/utmb{path}"
+        elif path.startswith(("/ai-scoring/", "/docs/")):
+            new_path = f"/utmb{path}"
+        else:
+            new_path = path
+        return f'{attr}={quote}{new_path}{quote}'
+
+    pattern = re.compile(r'\b(href|src)=(["\'])(/[^"\']*)\2', re.IGNORECASE)
+    return pattern.sub(_repl, html_text)
+
+
+def _proxy_upstream(origin: str, target: str, rewriter=None):
+    url = origin + target
+    if request.query_string:
+        url += "?" + request.query_string.decode("utf-8")
+    req = Request(url)
+    for header_name in ("X-Forwarded-For", "User-Agent", "Cookie"):
+        if header_name in request.headers:
+            req.add_header(header_name, request.headers[header_name])
     try:
-        with urlopen(EVERGREEN_ORIGIN + target, timeout=30) as upstream:
+        with urlopen(req, timeout=30) as upstream:
             body = upstream.read()
-            content_type = upstream.headers.get("Content-Type", "application/octet-stream")
-            disposition = upstream.headers.get("Content-Disposition")
+            status_code = getattr(upstream, "status", 200)
+            content_type = upstream.headers.get("Content-Type", "application/octet-stream") if hasattr(upstream, "headers") else "application/octet-stream"
+            disposition = upstream.headers.get("Content-Disposition") if hasattr(upstream, "headers") else None
+    except HTTPError as exc:
+        body = exc.read()
+        status_code = exc.code
+        content_type = exc.headers.get("Content-Type", "text/plain") if hasattr(exc, "headers") else "text/plain"
+        disposition = exc.headers.get("Content-Disposition") if hasattr(exc, "headers") else None
     except (URLError, TimeoutError):
-        app.logger.warning("Evergreen document source unavailable")
+        app.logger.warning("Upstream source unavailable: %s", url)
         abort(502)
-    if content_type.startswith("text/html"):
-        document = body.decode("utf-8")
-        for suffix, origin_path in EVERGREEN_LINKS.items():
-            if not suffix or origin_path == "/":
-                continue
-            for attribute in ("href", "src"):
-                document = document.replace(f'{attribute}="{origin_path}"',
-                                            f'{attribute}="/evergreen{suffix}"')
-        body = document.encode("utf-8")
-    response = Response(body, content_type=content_type)
+
+    if content_type.startswith("text/html") and rewriter:
+        body = rewriter(body.decode("utf-8")).encode("utf-8")
+
+    response = Response(body, status=status_code, content_type=content_type)
     response.headers["Cache-Control"] = "no-store"
     if disposition:
         response.headers["Content-Disposition"] = disposition
     return response
 
 
-for _suffix in EVERGREEN_LINKS:
-    app.add_url_rule("/evergreen" + _suffix, endpoint="evergreen" + _suffix,
-                     view_func=evergreen_link, methods=["GET"])
+@app.route("/evergreen", defaults={"subpath": ""}, methods=["GET"])
+@app.route("/evergreen/<path:subpath>", methods=["GET"])
+def evergreen_link(subpath: str = ""):
+    raw_subpath = "/" + subpath if subpath else ""
+    if raw_subpath in EVERGREEN_EXPLICIT_LINKS:
+        target = EVERGREEN_EXPLICIT_LINKS[raw_subpath]
+    elif raw_subpath in ("/guide", "/guide/"):
+        return redirect("/evergreen/guide/start", code=302)
+    elif raw_subpath.startswith(("/guide/", "/brand/", "/downloads/")) or raw_subpath == "/index.md":
+        target = raw_subpath
+    else:
+        abort(404)
+    return _proxy_upstream(EVERGREEN_ORIGIN, target, rewriter=_rewrite_evergreen_html)
+
+
+@app.route("/utmb", defaults={"subpath": ""}, methods=["GET"])
+@app.route("/utmb/<path:subpath>", methods=["GET"])
+def utmb_link(subpath: str = ""):
+    raw_subpath = "/" + subpath if subpath else ""
+    if raw_subpath in UTMB_EXPLICIT_LINKS:
+        target = UTMB_EXPLICIT_LINKS[raw_subpath]
+    elif raw_subpath.startswith(("/ai-scoring/", "/docs/")):
+        target = raw_subpath
+    else:
+        abort(404)
+    return _proxy_upstream(UTMB_ORIGIN, target, rewriter=_rewrite_utmb_html)
 
 
 @app.get("/resume")
