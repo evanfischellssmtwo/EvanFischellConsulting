@@ -48,6 +48,43 @@ def test_evergreen_source_failure_is_not_a_redirect(client, monkeypatch):
     assert client.get("/evergreen/unknown").status_code == 404
 
 
+def test_evergreen_guide_redirect(client):
+    response = client.get("/evergreen/guide")
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/evergreen/guide/start"
+
+
+def test_evergreen_guide_content_and_assets(client, monkeypatch):
+    import io
+    content = io.BytesIO(b'<link rel="stylesheet" href="/guide/assets/guide.css"><a href="/guide/models">Models</a><img src="/brand/logos/efc-wordmark-light.svg">')
+    content.headers = {"Content-Type": "text/html; charset=utf-8"}
+    monkeypatch.setattr(efc, "urlopen", lambda url, timeout: content)
+    response = client.get("/evergreen/guide/start")
+    assert response.status_code == 200
+    assert b'/evergreen/guide/assets/guide.css' in response.data
+    assert b'/evergreen/guide/models' in response.data
+    assert b'/evergreen/brand/logos/efc-wordmark-light.svg' in response.data
+
+
+def test_utmb_serves_and_rewrites_content(client, monkeypatch):
+    import io
+    content = io.BytesIO(b'<a href="/vendor-ai-review">Scorecard</a><a href="/panel-biographies">Dossier</a>')
+    content.headers = {"Content-Type": "text/html; charset=utf-8"}
+    monkeypatch.setattr(efc, "urlopen", lambda url, timeout: content)
+    response = client.get("/utmb")
+    assert response.status_code == 200
+    assert b'/utmb/vendor-ai-review' in response.data
+    assert b'/utmb/panel-biographies' in response.data
+
+
+def test_utmb_routes_and_error_handling(client, monkeypatch):
+    assert client.get("/utmb/unknown").status_code == 404
+    def unavailable(*args, **kwargs):
+        raise efc.URLError("unavailable")
+    monkeypatch.setattr(efc, "urlopen", unavailable)
+    assert client.get("/utmb").status_code == 502
+
+
 def test_invalid_chat_does_not_consume_quota(client):
     response = client.post("/api/agent/chat", json={"messages": []})
     assert response.status_code == 400
