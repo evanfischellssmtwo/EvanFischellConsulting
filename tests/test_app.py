@@ -48,6 +48,20 @@ def test_evergreen_source_failure_is_not_a_redirect(client, monkeypatch):
     assert client.get("/evergreen/unknown").status_code == 404
 
 
+def test_evergreen_phase_one_is_proxied_and_rewritten(client, monkeypatch):
+    import io
+    content = io.BytesIO(
+        b'<link href="/brand/efc.css"><a href="/phase-1">Deep dive</a><a href="/scope">Scope</a>'
+    )
+    content.headers = {"Content-Type": "text/html; charset=utf-8"}
+    monkeypatch.setattr(efc, "urlopen", lambda url, timeout: content)
+    response = client.get("/evergreen/phase-1")
+    assert response.status_code == 200
+    assert b'/evergreen/brand/efc.css' in response.data
+    assert b'/evergreen/phase-1' in response.data
+    assert b'/evergreen/scope' in response.data
+
+
 def test_evergreen_guide_redirect(client):
     response = client.get("/evergreen/guide")
     assert response.status_code == 302

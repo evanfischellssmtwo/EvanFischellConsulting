@@ -306,6 +306,7 @@ EVERGREEN_EXPLICIT_LINKS = {
     "/": "/scope",
     "/scope": "/scope",
     "/sow": "/",
+    "/phase-1": "/phase-1",
     "/scope.docx": "/downloads/evergreen-scope.docx",
     "/scope.pdf": "/downloads/evergreen-scope.pdf",
     "/sow.docx": "/downloads/evergreen-sow.docx",
@@ -345,7 +346,7 @@ def _rewrite_evergreen_html(html_text: str) -> str:
             new_path = "/evergreen/sow"
         elif path == "/scope":
             new_path = "/evergreen/scope"
-        elif path.startswith(("/guide", "/brand", "/downloads")) or path == "/index.md":
+        elif path.startswith(("/guide", "/brand", "/downloads", "/phase-1")) or path == "/index.md":
             new_path = f"/evergreen{path}"
         else:
             new_path = path
