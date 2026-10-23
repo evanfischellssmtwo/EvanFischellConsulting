@@ -1,0 +1,35 @@
+name: Diagnose agy on Linux (temporary)
+on:
+  pull_request:
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t efc-site:diag site
+      - name: Real turn with a dummy key (shows how the CLI fails on Linux)
+        run: |
+          cat > /tmp/diag.py <<'EOF'
+          import json, os, subprocess, sys, time
+          import agent_runtime, app
+          agent_runtime.prepare(app._agent_instructions())
+          env = agent_runtime._environment("/tmp/efc-agy/actions.jsonl")
+          cmd = [agent_runtime.AGY_BIN, "--agent", agent_runtime.AGENT_NAME, "--model", agent_runtime.AGY_MODEL,
+                 "--effort", "low", "--disable-slash-commands", "--print-timeout", "40s",
+                 "--output-format", "stream-json", "--input-format", "stream-json", "--print", ""]
+          frame = {"event": "user", "type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "hello"}]}}
+          t = time.time()
+          p = subprocess.run(cmd, cwd=str(agent_runtime._workspace()), env=env, input=json.dumps(frame) + "\n",
+                             capture_output=True, text=True, timeout=90)
+          print("exit", p.returncode, "seconds", round(time.time() - t, 1))
+          print("--- stdout"); print(p.stdout[-3000:])
+          print("--- stderr"); print(p.stderr[-3000:])
+          log = os.path.expanduser("/tmp/efc-agy/home/.gemini/antigravity-cli/cli.log")
+          for root, _, files in os.walk("/tmp/efc-agy/home"):
+              for name in files:
+                  if name.endswith(".log"):
+                      path = os.path.join(root, name)
+                      print("--- log", path)
+                      print(open(path, errors="replace").read()[-4000:])
+          EOF
+          docker run --rm -e GEMINI_API_KEY=AIzaDummyKeyForDiagnosticsOnly000000000 -v /tmp/diag.py:/app/diag.py efc-site:diag python diag.py
