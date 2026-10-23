@@ -34,3 +34,23 @@ jobs:
           for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8080/api/health && break; sleep 1; done
           curl -fsS -o /dev/null http://127.0.0.1:8080/
           docker logs efc | tail -20
+      # A real turn with a dummy key must reach the Gemini API and be refused
+      # there. "authentication required" means the CLI never entered API-key
+      # mode, which is what silently pushed production onto the fallback.
+      - name: CLI uses API-key mode inside the image
+        run: |
+          cat > /tmp/turn.py <<'EOF'
+          import json, subprocess
+          import agent_runtime, app
+          agent_runtime.prepare(app._agent_instructions())
+          cmd = [agent_runtime.AGY_BIN, "--agent", agent_runtime.AGENT_NAME, "--model", agent_runtime.AGY_MODEL,
+                 "--effort", "low", "--disable-slash-commands", "--print-timeout", "40s",
+                 "--output-format", "stream-json", "--input-format", "stream-json", "--print", ""]
+          frame = {"event": "user", "type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "hello"}]}}
+          p = subprocess.run(cmd, cwd=str(agent_runtime._workspace()), env=agent_runtime._environment("/tmp/a.jsonl"),
+                             input=json.dumps(frame) + "\n", capture_output=True, text=True, timeout=90)
+          print(p.stdout[-1500:]); print(p.stderr[-1500:])
+          assert "authentication required" not in p.stderr, "CLI is not in API-key mode"
+          assert '"event":"init"' in p.stdout, "CLI never started a conversation"
+          EOF
+          docker run --rm -e GEMINI_API_KEY=AIzaDummyKeyForCiOnly00000000000000000 -v /tmp/turn.py:/app/turn.py efc-site:ci python turn.py

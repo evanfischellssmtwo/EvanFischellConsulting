@@ -143,8 +143,17 @@ jobs:
               echo "::error::landing page now links to /$p, which is meant to be unlisted"; fail=1
             fi
           done
+          # One real chat turn: it must stream, finish, and come from the
+          # Antigravity CLI rather than the direct-API fallback.
+          curl -sS -N -X POST https://evanfischellconsulting.com/api/agent/stream \
+               -H 'Content-Type: application/json' \
+               -d '{"messages":[{"role":"user","text":"In one sentence, what does the firm do?"}]}' > /tmp/chat
+          if grep -q '"engine": "antigravity"' /tmp/chat; then
+            echo "ok  chat answered by the Antigravity CLI"
+          else
+            echo "::error::chat did not come from the Antigravity CLI"; tail -c 600 /tmp/chat; fail=1
+          fi
           exit $fail
-
       - name: Summary
         if: always()
         run: |
