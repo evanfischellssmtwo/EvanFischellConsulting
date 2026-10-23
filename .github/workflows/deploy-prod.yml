@@ -67,14 +67,18 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      # --source builds with Buildpacks via Cloud Build. Flags not given here
-      # are preserved from the live service, which is what keeps the Gemini key,
-      # the feedback bucket, max-instances and cpu-throttling settings intact.
+      # --source builds site/Dockerfile via Cloud Build (the image carries the
+      # Antigravity CLI). --clear-base-image drops the automatic base-image
+      # setting left over from the earlier Buildpacks builds; Cloud Run refuses
+      # a Dockerfile build while it is set. Flags not given here are preserved
+      # from the live service, which is what keeps the Gemini key, the feedback
+      # bucket, max-instances and cpu-throttling settings intact.
       - id: deploy
         name: Deploy to Cloud Run
         run: |
           gcloud run deploy "$SERVICE" \
             --source site \
+            --clear-base-image \
             --project "$PROJECT" \
             --region "$REGION" \
             --quiet

@@ -19,9 +19,12 @@ RUN apt-get update \
 # this tarball matches the official release manifest
 # (antigravity.google/cli/install.sh -> manifests/linux_amd64.json). The install
 # is root-owned and read-only, so the CLI can never update itself.
-ADD --checksum=sha256:513c74ad3e70323839a65d8dccc6f9977b0903e5facd914cbb06be283c2bb640 \
-    https://storage.googleapis.com/antigravity-public/antigravity-cli/1.4.6-4884751325200384/linux-x64/cli_linux_x64.tar.gz /tmp/agy.tgz
-RUN mkdir -p /opt/agy && tar -xzf /tmp/agy.tgz -C /opt/agy && rm /tmp/agy.tgz \
+# Downloaded and checked with Python rather than `ADD --checksum`, which needs
+# BuildKit; Cloud Build's default Docker builder may not have it.
+ARG AGY_URL=https://storage.googleapis.com/antigravity-public/antigravity-cli/1.4.6-4884751325200384/linux-x64/cli_linux_x64.tar.gz
+ARG AGY_SHA256=513c74ad3e70323839a65d8dccc6f9977b0903e5facd914cbb06be283c2bb640
+RUN python -c "import hashlib, sys, urllib.request; data = urllib.request.urlopen(sys.argv[1], timeout=300).read(); digest = hashlib.sha256(data).hexdigest(); sys.exit('agy checksum mismatch: ' + digest) if digest != sys.argv[2] else open('/tmp/agy.tgz', 'wb').write(data)" "$AGY_URL" "$AGY_SHA256" \
+    && mkdir -p /opt/agy && tar -xzf /tmp/agy.tgz -C /opt/agy && rm /tmp/agy.tgz \
     && chown -R root:root /opt/agy && chmod -R a-w /opt/agy \
     && ln -s /opt/agy/antigravity /usr/local/bin/agy \
     && HOME=/tmp/agy-version agy --version && rm -rf /tmp/agy-version
