@@ -194,3 +194,14 @@ def test_invalid_stream_request_does_not_consume_quota(client, stub_agy):
     response = client.post("/api/agent/stream", json={"messages": []})
     assert response.status_code == 400
     assert efc._usage["chat"] == 0
+
+
+def test_cli_settings_select_api_key_mode_only_with_a_key(monkeypatch):
+    import agent_runtime
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert "modelProvider" not in agent_runtime.cli_settings()
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    settings = agent_runtime.cli_settings()
+    assert settings["modelProvider"] == "gemini"
+    assert "command(*)" in settings["permissions"]["deny"]

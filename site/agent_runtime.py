@@ -69,6 +69,20 @@ PERMISSIONS = {
     },
 }
 
+def cli_settings():
+    """The CLI's settings file: the permission policy, plus API-key mode.
+
+    The CLI ignores GEMINI_API_KEY unless ``modelProvider`` is ``gemini``
+    (seen on Linux: "authentication required" with only the variable set). The
+    key is only present on Cloud Run; on a workstation the CLI keeps its own
+    Google sign-in.
+    """
+    settings = dict(PERMISSIONS)
+    if os.environ.get("GEMINI_API_KEY"):
+        settings["modelProvider"] = "gemini"
+    return settings
+
+
 EMPTY_REPLY = ("I didn't manage a proper answer to that. Could you try again, or "
                "write to Evan at evan@evanfischellconsulting.com?")
 
@@ -136,7 +150,7 @@ def prepare(instructions):
         (config / "mcp_config.json").write_text(json.dumps(mcp, indent=2), encoding="utf-8")
         cli = _home() / ".gemini" / "antigravity-cli"
         cli.mkdir(parents=True, exist_ok=True)
-        (cli / "settings.json").write_text(json.dumps(PERMISSIONS, indent=2), encoding="utf-8")
+        (cli / "settings.json").write_text(json.dumps(cli_settings(), indent=2), encoding="utf-8")
         _prepared_for = instructions
 
 
@@ -289,7 +303,7 @@ def stream_turn(contents, instructions):
                 if not reply:
                     reply = EMPTY_REPLY
                     yield {"type": "text", "delta": reply}
-                yield {"type": "done", "reply": reply,
+                yield {"type": "done", "reply": reply, "engine": "antigravity",
                        "seconds": round(time.monotonic() - started, 2)}
         process.wait(timeout=10)
         if not finished:

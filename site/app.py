@@ -585,7 +585,7 @@ def _fallback_events(contents, page):
     yield {"type": "text", "delta": parsed["reply"]}
     if parsed["action"]:
         yield from _carry_out(parsed["action"], page)
-    yield {"type": "done", "reply": parsed["reply"]}
+    yield {"type": "done", "reply": parsed["reply"], "engine": "fallback"}
 
 
 def _agent_events(contents, page):
