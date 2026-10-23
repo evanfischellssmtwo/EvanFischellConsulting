@@ -13,7 +13,9 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-from flask import Flask, Response, abort, jsonify, redirect, request, send_from_directory
+from flask import Flask, Response, abort, jsonify, redirect, request, send_from_directory, stream_with_context
+
+import agent_runtime
 
 app = Flask(__name__)
 
@@ -24,7 +26,9 @@ REDIRECT_HOSTS = {
     "www.evanfischellconsulting.com",
 }
 
-MODEL = os.getenv("EFC_MODEL", "gemini-3.1-pro-preview")
+# The chat runs on the Antigravity CLI (agent_runtime.py). MODEL is the direct
+# Gemini API model used when that path is unavailable and for page generation.
+MODEL = os.getenv("EFC_MODEL", "gemini-3.8-flash")
 CHAT_DAILY_CAP = int(os.getenv("CHAT_DAILY_CAP", "200"))
 PAGE_DAILY_CAP = int(os.getenv("PAGE_DAILY_CAP", "15"))
 FEEDBACK_DAILY_CAP = int(os.getenv("FEEDBACK_DAILY_CAP", "100"))
@@ -106,6 +110,8 @@ def _normalize_messages(data):
         if not isinstance(message, dict):
             raise ValueError("each message must be an object")
         role = message.get("role")
+        if role == "agent":  # what the chat drawer has always sent for its own turns
+            role = "model"
         if role not in {"user", "model"}:
             raise ValueError("message role must be user or model")
         text = message.get("text")
@@ -471,34 +477,190 @@ def vendor_ai_review():
     return send_from_directory(app.root_path, "vendor-ai-review.html")
 
 
-@app.post("/api/agent/chat")
-def agent_chat():
+AGENT_RULES = """# How you work on this site
+
+You run inside the chat drawer of evanfischellconsulting.com. The knowledge
+base below is everything you know about the firm and how to behave. These
+rules come first.
+
+## Writing
+
+Write like a senior consultant answering a peer by email: short, plain,
+specific. Two to five sentences is normal; never more than about 150 words.
+Plain text only, no headings, no tables. A short list is fine when the
+visitor asks for steps.
+
+Avoid the habits people now associate with machine-written text:
+- No em dashes or en dashes. Use a comma, a period or parentheses.
+- No "It's not X, it's Y" or "not just X, but Y" constructions.
+- No reflexive groups of three adjectives or phrases.
+- No openers like "Great question", "Absolutely", "Certainly" or "I'd be happy
+  to", and no closing offers like "Let me know if you have other questions".
+- Avoid these words: delve, leverage, seamless, robust, unlock, empower,
+  elevate, transform, journey, landscape, game-changer, cutting-edge,
+  holistic, synergy, navigate, tapestry, realm, crucial, pivotal.
+- Don't restate the question. Answer it, then stop.
+- Say "we" for the firm. Say "Evan" for the founder.
+
+## Tools
+
+You have exactly two tools, on the "efc-site" MCP server. Call them through
+call_mcp_tool with ServerName "efc-site" and these exact argument names:
+
+- save_feedback with Arguments {"note": "<the visitor's point in their own
+  words>", "about": "<the part of the site it concerns>"}. Use it whenever a
+  visitor critiques, corrects or praises the site or the resume. Then confirm
+  in one sentence that Evan will see it.
+- create_page with Arguments {"brief": "<one paragraph: what the page should
+  be, who it is for and what it should cover>"}. Use it only under the rules
+  for your hidden ability below. Then tell the visitor in one sentence that
+  the page is on its way and will appear in the chat.
+
+You have no other tools: no browsing, no files, no commands. Don't offer
+anything that would need them.
+"""
+
+
+def _agent_instructions():
+    return AGENT_RULES + "\n\n" + _kb()
+
+
+PAGE_CONTEXTS = {
+    "home": "",
+    "resume": "(The visitor is reading Evan's resume page.)",
+    "404": "(The visitor arrived from a page that does not exist.)",
+}
+
+SORRY = ("Something went wrong on my end. You can always reach Evan at "
+         "evan@evanfischellconsulting.com.")
+LIMIT_REPLY = ("I've hit my conversation limit for today. Please reach Evan directly "
+               "at evan@evanfischellconsulting.com.")
+
+
+def _with_page_context(contents, page):
+    note = PAGE_CONTEXTS.get(page, "")
+    if not note:
+        return contents
+    latest = contents[-1]
+    text = note + "\n" + latest["parts"][0]["text"]
+    return contents[:-1] + [{"role": latest["role"], "parts": [{"text": text}]}]
+
+
+def _carry_out(action, page):
+    """Run a site action the agent asked for; yield what the drawer must do."""
+    if action["type"] == "create_page":
+        yield {"type": "action", "action": action}
+        return
+    if action["type"] == "save_feedback":
+        if not _spend("feedback", FEEDBACK_DAILY_CAP):
+            logger.warning("feedback cap reached; agent note dropped")
+            return
+        entry = {
+            "id": pysecrets.token_urlsafe(6),
+            "ts": time.time(),
+            "when": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()),
+            "note": action["note"],
+            "about": action.get("about", ""),
+            "page": page,
+        }
+        try:
+            _save_feedback(entry)
+        except Exception:
+            logger.exception("feedback save failed")
+
+
+def _fallback_events(contents, page):
+    """Direct Gemini API turn, used when the Antigravity CLI is unavailable."""
+    from google.genai import types
+    resp = _client().models.generate_content(
+        model=MODEL,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=_agent_instructions() + CHAT_PROTOCOL,
+            response_mime_type="application/json",
+            max_output_tokens=4096,
+        ),
+    )
+    parsed = _parse_chat_response(resp.text)
+    yield {"type": "text", "delta": parsed["reply"]}
+    if parsed["action"]:
+        yield from _carry_out(parsed["action"], page)
+    yield {"type": "done", "reply": parsed["reply"]}
+
+
+def _agent_events(contents, page):
+    """Yield drawer events for one turn: text, tool, action, done or error."""
+    contents = _with_page_context(contents, page)
+    if agent_runtime.available():
+        produced = False
+        try:
+            for event in agent_runtime.stream_turn(contents, _agent_instructions()):
+                produced = True
+                if event["type"] == "action":
+                    yield from _carry_out(event["action"], page)
+                else:
+                    yield event
+            return
+        except Exception:
+            logger.exception("antigravity turn failed")
+            if produced:
+                yield {"type": "error", "reply": SORRY}
+                return
     try:
-        contents = _normalize_messages(request.get_json(silent=True))
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    if not _spend("chat", CHAT_DAILY_CAP):
-        return jsonify({"reply": "I've hit my conversation limit for today — "
-                        "please reach Evan directly at evan@evanfischellconsulting.com.",
-                        "action": None}), 429
-    try:
-        from google.genai import types
-        resp = _client().models.generate_content(
-            model=MODEL,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                system_instruction=_kb() + CHAT_PROTOCOL,
-                response_mime_type="application/json",
-                max_output_tokens=8192,
-                thinking_config=types.ThinkingConfig(thinking_budget=2048),
-            ),
-        )
-        return jsonify(_parse_chat_response(resp.text))
+        yield from _fallback_events(contents, page)
     except Exception:
         logger.exception("chat generation failed")
-        return jsonify({"reply": "Something went wrong on my end. You can always "
-                        "reach Evan at evan@evanfischellconsulting.com.",
-                        "action": None}), 502
+        yield {"type": "error", "reply": SORRY}
+
+
+def _chat_request():
+    """Validate a chat request and take one unit of quota.
+
+    Returns ``(contents, page, None)`` or ``(None, None, error_response)``.
+    """
+    data = request.get_json(silent=True)
+    try:
+        contents = _normalize_messages(data)
+    except ValueError as exc:
+        return None, None, (jsonify({"error": str(exc)}), 400)
+    if not _spend("chat", CHAT_DAILY_CAP):
+        return None, None, (jsonify({"reply": LIMIT_REPLY, "action": None}), 429)
+    page = str(data.get("page") or "home")
+    return contents, page if page in PAGE_CONTEXTS else "home", None
+
+
+@app.post("/api/agent/stream")
+def agent_stream():
+    """Chat turn as newline-delimited JSON events (what the drawer uses)."""
+    contents, page, error = _chat_request()
+    if error:
+        return error
+
+    def generate():
+        for event in _agent_events(contents, page):
+            yield json.dumps(event) + "\n"
+
+    return Response(stream_with_context(generate()), mimetype="application/x-ndjson",
+                    headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
+@app.post("/api/agent/chat")
+def agent_chat():
+    """Chat turn as one JSON object ``{reply, action}`` (kept for scripts)."""
+    contents, page, error = _chat_request()
+    if error:
+        return error
+    reply, action, status = "", None, 200
+    for event in _agent_events(contents, page):
+        if event["type"] == "done":
+            reply = event.get("reply") or reply
+        elif event["type"] == "error":
+            reply, status = event["reply"], 502
+        elif event["type"] == "text":
+            reply += event["delta"]
+        elif event["type"] == "action" and action is None:
+            action = event["action"]
+    return jsonify({"reply": reply.strip() or SORRY, "action": action}), status
 
 
 @app.post("/api/agent/page")
